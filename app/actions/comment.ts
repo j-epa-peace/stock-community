@@ -1,0 +1,97 @@
+'use server'
+
+import { prisma } from '@/lib/prisma'
+import { getCurrentUser } from '@/lib/auth'
+
+export async function createComment(data: { postId: string; content: string }) {
+    try {
+        const currentUser = await getCurrentUser()
+        if (!currentUser) {
+            return { error: '로그인이 필요합니다' }
+        }
+
+        const comment = await prisma.comment.create({
+            data: {
+                content: data.content,
+                postId: data.postId,
+                userId: currentUser.userId
+            },
+            include: {
+                user: {
+                    select: { name: true, id: true }
+                }
+            }
+        })
+
+        return { success: true, comment }
+    } catch (error) {
+        console.error('Create comment error:', error)
+        return { error: '댓글 작성에 실패했습니다' }
+    }
+}
+
+export async function getComments(postId: string) {
+    try {
+        const comments = await prisma.comment.findMany({
+            where: { postId },
+            orderBy: { createdAt: 'asc' },
+            include: {
+                user: {
+                    select: { name: true, id: true }
+                }
+            }
+        })
+
+        return { success: true, comments }
+    } catch (error) {
+        console.error('Get comments error:', error)
+        return { error: '댓글을 불러오는데 실패했습니다' }
+    }
+}
+
+export async function updateComment(commentId: string, content: string) {
+    try {
+        const currentUser = await getCurrentUser()
+        if (!currentUser) return { error: '로그인이 필요합니다' }
+
+        const comment = await prisma.comment.findUnique({
+            where: { id: commentId }
+        })
+
+        if (!comment) return { error: '댓글을 찾을 수 없습니다' }
+        if (comment.userId !== currentUser.userId) return { error: '권한이 없습니다' }
+
+        await prisma.comment.update({
+            where: { id: commentId },
+            data: { content }
+        })
+
+        return { success: true }
+    } catch (error) {
+        console.error('Update comment error:', error)
+        return { error: '댓글 수정에 실패했습니다' }
+    }
+}
+
+export async function deleteComment(commentId: string) {
+    try {
+        const currentUser = await getCurrentUser()
+        if (!currentUser) return { error: '로그인이 필요합니다' }
+
+        const comment = await prisma.comment.findUnique({
+            where: { id: commentId }
+        })
+
+        if (!comment) return { error: '댓글을 찾을 수 없습니다' }
+        if (comment.userId !== currentUser.userId) return { error: '권한이 없습니다' }
+
+        await prisma.comment.delete({
+            where: { id: commentId }
+        })
+
+        return { success: true }
+    } catch (error) {
+        console.error('Delete comment error:', error)
+        return { error: '댓글 삭제에 실패했습니다' }
+    }
+}

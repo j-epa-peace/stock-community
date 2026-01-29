@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  # 1. Database Service (PostgreSQL)
+  db:
+    image: postgres:15-alpine
+    container_name: stock-community-db
+    environment:
+      POSTGRES_USER: myuser
+      POSTGRES_PASSWORD: mypassword
+      POSTGRES_DB: stockdb
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - stock-net
+
+  # 2. Application Service (Next.js)
+  app:
+    image: node:20-slim
+    container_name: stock-community-app
+    working_dir: /app
+    # 개발 모드 실행 (의존성 설치 후 dev 서버 기동)
+    command: sh -c "apt-get update && apt-get install -y openssl ca-certificates && npm install && npm run dev" 
+    ports:
+      - "3000:3000"
+    environment:
+      # Prisma 등 ORM을 위한 DB 연결 문자열
+      DATABASE_URL: postgresql://myuser:mypassword@db:5432/stockdb
+      NODE_ENV: development
+    volumes:
+      - ./:/app
+      - /app/node_modules
+    depends_on:
+      - db
+    networks:
+      - stock-net
+
+volumes:
+  pg_data:
+
+networks:
+  stock-net:
+    driver: bridge
