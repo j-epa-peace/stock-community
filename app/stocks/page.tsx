@@ -31,7 +31,7 @@ export default function StocksPage() {
           </Link>
 
 
-          
+
 
           {/* 해외 주식 */}
           <Link href="/stocks/international" className="group">
