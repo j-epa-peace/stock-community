@@ -30,6 +30,9 @@ export default function StocksPage() {
             </div>
           </Link>
 
+
+          
+
           {/* 해외 주식 */}
           <Link href="/stocks/international" className="group">
             <div className="bg-gray-800 rounded-xl p-6 md:p-8 border border-gray-700 hover:border-primary-500 transition-all duration-300 hover:shadow-lg hover:shadow-primary-500/20">
