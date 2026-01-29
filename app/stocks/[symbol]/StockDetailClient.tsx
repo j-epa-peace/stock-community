@@ -37,7 +37,7 @@ type Post = {
   createdAt: string
   user: User
   likes: number
-  comments: number
+  comments: Comment[]
   isLiked: boolean
 }
 

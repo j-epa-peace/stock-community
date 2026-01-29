@@ -1,7 +1,8 @@
 import { prisma } from '@/lib/prisma'
 import StockDetailClient from './StockDetailClient'
 
-export default async function StockDetailPage({ params }: { params: { symbol: string } }) {
+export default async function StockDetailPage(props: { params: Promise<{ symbol: string }> }) {
+  const params = await props.params
   const stock = await prisma.stock.findUnique({
     where: { symbol: params.symbol },
     select: {

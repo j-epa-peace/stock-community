@@ -36,7 +36,8 @@ export async function signup(formData: FormData) {
 
     // Generate token and set cookie
     const token = generateToken({ userId: user.id, email: user.email })
-    cookies().set('auth-token', token, {
+    const cookieStore = await cookies()
+    cookieStore.set('auth-token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
@@ -76,7 +77,8 @@ export async function login(formData: FormData) {
 
     // Generate token and set cookie
     const token = generateToken({ userId: user.id, email: user.email })
-    cookies().set('auth-token', token, {
+    const cookieStore = await cookies()
+    cookieStore.set('auth-token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
@@ -91,6 +93,6 @@ export async function login(formData: FormData) {
 }
 
 export async function logout() {
-  cookies().delete('auth-token')
+  (await cookies()).delete('auth-token')
   redirect('/')
 }

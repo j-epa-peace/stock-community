@@ -3,8 +3,9 @@ import { prisma } from '@/lib/prisma'
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { symbol: string } }
+  context: { params: Promise<{ symbol: string }> }
 ) {
+  const params = await context.params
   try {
     const stock = await prisma.stock.findUnique({
       where: { symbol: params.symbol },
