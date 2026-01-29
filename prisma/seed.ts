@@ -4,6 +4,31 @@ import { stockSeedData } from '../lib/stock-data'
 const prisma = new PrismaClient()
 
 async function main() {
+  // Create Users
+  const users = [
+    { id: '1', name: '투자왕김씨', email: 'kim@example.com', password: 'password123' },
+    { id: '2', name: '주식고수', email: 'master@example.com', password: 'password123' },
+    { id: '3', name: '코스피러버', email: 'kospi@example.com', password: 'password123' },
+    { id: '4', name: '나스닥킹', email: 'nasdaq@example.com', password: 'password123' },
+    { id: '5', name: '가치투자자', email: 'value@example.com', password: 'password123' },
+    { id: '6', name: '성장주헌터', email: 'growth@example.com', password: 'password123' },
+    { id: '7', name: '배당주좋아', email: 'dividend@example.com', password: 'password123' },
+    { id: '8', name: '테크주매니아', email: 'tech@example.com', password: 'password123' },
+    { id: '9', name: '바이오투자', email: 'bio@example.com', password: 'password123' },
+    { id: '10', name: '반도체왕', email: 'semi@example.com', password: 'password123' }
+  ]
+
+  // Clear existing users
+  await prisma.user.deleteMany({})
+
+  for (const user of users) {
+    await prisma.user.upsert({
+      where: { email: user.email },
+      create: user,
+      update: user,
+    })
+  }
+
   // Ensure Samsung's ".KS" symbol exists since some UI uses it.
   const extra = {
     symbol: '005930.KS',

@@ -22,12 +22,12 @@ services:
     container_name: stock-community-app
     working_dir: /app
     # 개발 모드 실행 (의존성 설치 후 dev 서버 기동)
-    command: sh -c "apt-get update && apt-get install -y openssl ca-certificates && npm install && npm run dev" 
+    command: sh -c "apt-get update && apt-get install -y openssl ca-certificates && npm install && npm run dev"
     ports:
       - "3000:3000"
     environment:
       # Prisma 등 ORM을 위한 DB 연결 문자열
-      DATABASE_URL: postgresql://myuser:mypassword@db:5432/stockdb
+      DATABASE_URL: postgresql://neondb_owner:npg_cyZhPWJR7f8C@ep-crimson-firefly-ahvvw1g3-pooler.c-3.us-east-1.aws.neon.tech/neondb?sslmode=require
       NODE_ENV: development
     volumes:
       - ./:/app
@@ -39,6 +39,7 @@ services:
 
 volumes:
   pg_data:
+
 
 networks:
   stock-net:
