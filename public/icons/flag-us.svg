@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1235 650">
+  <rect width="1235" height="650" fill="#b22234"/>
+  <g fill="#fff">
+    <rect y="50" width="1235" height="50"/>
+    <rect y="150" width="1235" height="50"/>
+    <rect y="250" width="1235" height="50"/>
+    <rect y="350" width="1235" height="50"/>
+    <rect y="450" width="1235" height="50"/>
+    <rect y="550" width="1235" height="50"/>
+  </g>
+  <rect width="494" height="350" fill="#3c3b6e"/>
+  <g fill="#fff">
+    <g id="s">
+      <polygon points="0,-18.2 5.9,-6.2 19,-6.2 8.4,1.5 12.5,14 -0,5 -12.5,14 -8.4,1.5 -19,-6.2 -5.9,-6.2"/>
+    </g>
+    <g id="row1">
+        <use href="#s" x="32" y="27"/>
+        <use href="#s" x="110" y="27"/>
+        <use href="#s" x="188" y="27"/>
+        <use href="#s" x="266" y="27"/>
+        <use href="#s" x="344" y="27"/>
+        <use href="#s" x="422" y="27"/>
+    </g>
+    <g id="row2">
+        <use href="#s" x="71" y="64"/>
+        <use href="#s" x="149" y="64"/>
+        <use href="#s" x="227" y="64"/>
+        <use href="#s" x="305" y="64"/>
+        <use href="#s" x="383" y="64"/>
+    </g>
+    <use href="#row1" y="74"/>
+    <use href="#row2" y="74"/>
+    <use href="#row1" y="148"/>
+    <use href="#row2" y="148"/>
+    <use href="#row1" y="222"/>
+    <use href="#row2" y="222"/>
+    <use href="#row1" y="296"/>
+  </g>
+</svg>

@@ -6,9 +6,11 @@
   html {
     @apply dark;
   }
-  
+
   body {
-    @apply bg-gray-950 text-white;
+    @apply bg-black text-white selection:bg-white/20;
+    background-image: radial-gradient(circle at 50% 0%, #111827 0%, #000000 90%);
+    background-attachment: fixed;
   }
 }
 
@@ -32,4 +34,22 @@
 
 ::-webkit-scrollbar-thumb:hover {
   @apply bg-gray-600;
+}
+
+/* Custom Scrollbar Utility */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
 }

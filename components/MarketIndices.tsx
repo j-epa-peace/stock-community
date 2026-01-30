@@ -1,137 +1,362 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer } from 'recharts'
-import { marketIndices } from '@/lib/mock-data'
+import { motion, AnimatePresence } from 'framer-motion'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 
-export default function MarketIndices() {
-  const [animationProgress, setAnimationProgress] = useState<Record<string, number>>({})
+interface MarketIndex {
+  name: string
+  symbol: string
+  value: number
+  change: number
+  changePercent: number
+  previousClose?: number
+  data: { time: number; value: number }[] // Changed to number
+}
+
+type TabType = 'domestic' | 'global' | 'exchange' | 'crypto'
+
+// Sub-component for Lazy Loading & Animation
+const MarketIndexCard = ({ index }: { index: MarketIndex }) => {
+  const [isVisible, setIsVisible] = useState(false)
+  const cardRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    // 각 차트의 애니메이션 진행도 초기화
-    const initialProgress: Record<string, number> = {}
-    marketIndices.forEach(index => {
-      initialProgress[index.name] = 0
-    })
-    setAnimationProgress(initialProgress)
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        // Toggle visibility based on intersection for re-animation
+        setIsVisible(entry.isIntersecting)
+      },
+      { threshold: 0.1 } // Low threshold to trigger early
+    )
 
-    // 조금 더 천천히 애니메이션 진행 (150ms 간격)
-    marketIndices.forEach(index => {
-      let currentStep = 0
-      const totalSteps = index.data.length
-      
-      const interval = setInterval(() => {
-        currentStep++
-        setAnimationProgress(prev => ({
-          ...prev,
-          [index.name]: currentStep / totalSteps
-        }))
-        
-        if (currentStep >= totalSteps) {
-          clearInterval(interval)
-        }
-      }, 150) // 150ms로 조금 더 천천히
-    })
+    if (cardRef.current) {
+      observer.observe(cardRef.current)
+    }
+
+    return () => observer.disconnect()
   }, [])
 
+  const isUp = index.change >= 0
+  const color = isUp ? '#ef4444' : '#3b82f6'
+
+  // 모바일 최적화 (데이터 포인트 샘플링)
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768
+  const dataPoints = isMobile ? index.data.filter((_, i) => i % 5 === 0) : index.data
+  const ticks = generateHourlyTicks(index.data) // Assuming this function is available or moved
+  const safeId = index.symbol.replace(/[^a-zA-Z0-9]/g, '')
+
+  // Format Time Helper (Moved from parent or duplicated if simple)
+  const formatTime = (timestamp: number, name: string) => {
+    try {
+      if (!timestamp) return ''
+      const date = new Date(timestamp)
+      let timeZone = 'Asia/Seoul'
+      if (name.includes('NASDAQ') || name.includes('S&P')) timeZone = 'America/New_York'
+      else if (name.includes('Nikkei') || name.includes('JPY')) timeZone = 'Asia/Tokyo'
+      else if (name.includes('Shanghai') || name.includes('CNY')) timeZone = 'Asia/Shanghai'
+      return date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone })
+    } catch { return '' }
+  }
+
   return (
-    <div className="bg-gray-800 rounded-lg shadow-sm p-6 mb-8 border border-gray-700">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-white">시장 지수</h2>
-        <span className="text-xs text-gray-400">모든 시간은 한국 시간(KST) 기준</span>
+    <motion.div
+      ref={cardRef}
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      transition={{ duration: 0.4, type: "spring" }}
+      className="min-w-[85vw] md:min-w-full flex-shrink-0 snap-center bg-white/5 backdrop-blur-xl rounded-3xl p-6 border border-white/10 shadow-glass relative overflow-hidden"
+    >
+      {/* Card Header */}
+      <div className="flex justify-between items-start mb-6">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <h3 className="text-gray-400 font-medium text-sm">{index.name}</h3>
+            <span className="text-[10px] bg-gray-700 text-gray-400 px-1.5 py-0.5 rounded">
+              {['KOSPI', 'KOSDAQ', 'USD/KRW'].some(s => index.name.includes(s)) ? 'KST' :
+                ['NASDAQ', 'S&P 500', 'Bitcoin', 'Ethereum'].some(s => index.name.includes(s)) ? 'EST' :
+                  ['Nikkei'].some(s => index.name.includes(s)) ? 'JST' :
+                    ['Shanghai', 'CNY'].some(s => index.name.includes(s)) ? 'CST' : 'Local'}
+            </span>
+          </div>
+          <div className="flex items-baseline gap-3">
+            <span className="text-3xl font-bold text-white tracking-tighter">
+              {index.value.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+            </span>
+          </div>
+        </div>
+        <div className={`text-right px-3 py-1.5 rounded-lg bg-opacity-10 ${isUp ? 'bg-red-500' : 'bg-blue-500'}`}>
+          <div className={`text-sm font-bold ${isUp ? 'text-red-400' : 'text-blue-400'}`}>
+            {isUp ? '▲' : '▼'} {Math.abs(index.change).toFixed(2)}
+          </div>
+          <div className={`text-xs font-medium opacity-80 ${isUp ? 'text-red-400' : 'text-blue-400'}`}>
+            {index.changePercent.toFixed(2)}%
+          </div>
+        </div>
       </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {marketIndices.map((index) => {
-          // 각 차트별 Y축 범위 계산 (고정)
-          const values = index.data.map(d => d.value)
-          const minValue = Math.min(...values)
-          const maxValue = Math.max(...values)
-          const padding = (maxValue - minValue) * 0.1
-          const yAxisMin = minValue - padding
-          const yAxisMax = maxValue + padding
 
-          // 현재 진행도에 따른 데이터
-          const progress = animationProgress[index.name] || 0
-          const currentDataLength = Math.floor(progress * index.data.length)
-          const currentData = index.data.slice(0, currentDataLength)
+      {/* Chart */}
+      <div className="h-28 -mx-2">
+        {isVisible && (
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={dataPoints}>
+              <defs>
+                <linearGradient id={`fillGradient-${safeId}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={color} stopOpacity={0.3} />
+                  <stop offset="95%" stopColor={color} stopOpacity={0} />
+                </linearGradient>
+              </defs>
 
-          return (
-            <div key={index.name} className="border border-gray-600 rounded-lg p-4 bg-gray-750 relative">
-              <div className="flex justify-between items-start mb-4">
-                <div>
-                  <h3 className="font-semibold text-lg text-white">{index.name}</h3>
-                  <p className="text-2xl font-bold text-white">
-                    {index.value.toLocaleString()}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className={`text-sm font-medium ${
-                    index.change >= 0 ? 'text-green-400' : 'text-red-400'
-                  }`}>
-                    {index.change >= 0 ? '+' : ''}{index.change.toFixed(2)}
-                  </p>
-                  <p className={`text-sm ${
-                    index.changePercent >= 0 ? 'text-green-400' : 'text-red-400'
-                  }`}>
-                    ({index.changePercent >= 0 ? '+' : ''}{index.changePercent.toFixed(2)}%)
-                  </p>
-                </div>
-              </div>
-              
-              <div className="h-24 mb-3 relative overflow-hidden">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={index.data}> {/* 전체 데이터로 고정된 축 */}
-                    <XAxis 
-                      dataKey="time" 
-                      hide 
-                    />
-                    <YAxis 
-                      hide 
-                      domain={[yAxisMin, yAxisMax]} // 고정된 Y축
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="value" 
-                      stroke={index.change >= 0 ? '#4ade80' : '#f87171'}
-                      strokeWidth={2.5}
-                      dot={false}
-                      animationDuration={0}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-                
-                {/* 진행 오버레이 - 오른쪽에서 왼쪽으로 마스킹 */}
-                <div 
-                  className="absolute top-0 right-0 h-full bg-gray-750 transition-all duration-150 ease-linear"
-                  style={{ 
-                    width: `${(1 - progress) * 100}%`
-                  }}
-                />
-              </div>
-              
-              {/* 타임라인 표시 */}
-              <div className="flex justify-between text-xs text-gray-400">
-                {index.name.includes('KOSPI') || index.name.includes('KOSDAQ') ? (
-                  <>
-                    <span>09:00</span>
-                    <span>11:00</span>
-                    <span>13:00</span>
-                    <span>15:00</span>
-                  </>
-                ) : (
-                  <>
-                    <span>23:30</span>
-                    <span>01:00</span>
-                    <span>02:30</span>
-                    <span>04:30</span>
-                  </>
-                )}
-              </div>
-            </div>
-          )
-        })}
+              <XAxis
+                dataKey="time"
+                type="number"
+                domain={['dataMin', 'dataMax']}
+                ticks={ticks}
+                tickFormatter={(t) => formatTime(t, index.name)}
+                tick={{ fill: '#9ca3af', fontSize: 11, fontWeight: 500 }}
+                axisLine={false}
+                tickLine={false}
+                dy={10}
+              />
+              <YAxis hide domain={['auto', 'auto']} />
+
+              {/* Layer 1: Fill with Fade Gradient (Animated Sync) */}
+              <Area
+                type="monotone"
+                dataKey="value"
+                stroke="none"
+                fill={`url(#fillGradient-${safeId})`}
+                isAnimationActive={true} // Animation Enabled
+                animationDuration={2000} // Slower for effect
+                animationEasing="ease-out"
+              />
+
+              {/* Layer 2: Solid Stroke (Animated Sync) */}
+              <Area
+                type="monotone"
+                dataKey="value"
+                stroke={color}
+                strokeWidth={2.5}
+                fill="none"
+                isAnimationActive={true} // Animation Enabled
+                animationDuration={2000}
+                animationEasing="ease-out"
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        )}
       </div>
-    </div>
+
+      {/* Reference Line (Optional/Visual) */}
+      <div className="absolute left-6 right-6 top-1/2 border-t border-dashed border-gray-600/30 pointer-events-none opacity-0" />
+    </motion.div>
   )
 }
+
+// Helpers needed outside if not passed
+const generateHourlyTicks = (data: { time: number }[]) => {
+  if (!data.length) return []
+  const startTime = data[0].time
+  const endTime = data[data.length - 1].time
+  const ticks = []
+  let current = new Date(startTime)
+  current.setMinutes(0, 0, 0)
+  if (current.getTime() < startTime) current.setHours(current.getHours() + 1)
+  while (current.getTime() <= endTime) {
+    ticks.push(current.getTime())
+    current.setHours(current.getHours() + 1)
+  }
+  return ticks
+}
+
+export default function MarketIndices() {
+  const [indices, setIndices] = useState<MarketIndex[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<TabType>('domestic') // Moved up
+  const [showLeft, setShowLeft] = useState(false)
+  const [showRight, setShowRight] = useState(true)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+
+  const checkScroll = () => {
+    if (scrollContainerRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current
+      // Tolerance for browser subpixel rendering
+      setShowLeft(scrollLeft > 2)
+      setShowRight(Math.ceil(scrollLeft + clientWidth) < scrollWidth - 2)
+    }
+  }
+
+  // Initial Check
+  useEffect(() => {
+    // Check frequently
+    checkScroll()
+    const t1 = setTimeout(checkScroll, 100)
+    const t2 = setTimeout(checkScroll, 300)
+    window.addEventListener('resize', checkScroll)
+    return () => {
+      window.removeEventListener('resize', checkScroll)
+      clearTimeout(t1)
+      clearTimeout(t2)
+    }
+  }, [indices, activeTab])
+
+  // Reset scroll position when tab changes
+  useEffect(() => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTo({ left: 0, behavior: 'smooth' })
+      setTimeout(checkScroll, 350)
+    }
+  }, [activeTab])
+
+  // Fetch Real Data
+  useEffect(() => {
+    const fetchIndices = async () => {
+      try {
+        const response = await fetch('/api/market/indices')
+        if (!response.ok) throw new Error('Failed to fetch market data')
+        const data = await response.json()
+        setIndices(data)
+        setLoading(false)
+      } catch (err) {
+        console.error(err)
+        setError('시장 데이터를 불러오는데 실패했습니다.')
+        setLoading(false)
+      }
+    }
+
+    fetchIndices()
+    const interval = setInterval(fetchIndices, 60000)
+    return () => clearInterval(interval)
+  }, [])
+
+  // Filter Indices for Tabs
+  const domesticIndices = indices.filter(i => ['KOSPI', 'KOSDAQ'].includes(i.name))
+  const globalIndices = indices.filter(i => ['NASDAQ', 'S&P 500', 'Nikkei 225', 'Shanghai'].includes(i.name))
+  const exchangeIndices = indices.filter(i => ['USD/KRW', 'JPY/KRW', 'CNY/KRW'].includes(i.name))
+  const cryptoIndices = indices.filter(i => ['Bitcoin', 'Ethereum'].includes(i.name))
+
+  let visibleIndices: MarketIndex[] = []
+  switch (activeTab) {
+    case 'domestic': visibleIndices = domesticIndices; break;
+    case 'global': visibleIndices = globalIndices; break;
+    case 'exchange': visibleIndices = exchangeIndices; break;
+    case 'crypto': visibleIndices = cryptoIndices; break;
+  }
+
+  if (loading) {
+    return (
+      <div className="bg-gray-800 rounded-lg shadow-sm p-6 mb-8 border border-gray-700 animate-pulse h-96"></div>
+    )
+  }
+
+  if (error) return null
+
+  return (
+    <div className="mb-4">
+      {/* Header */}
+      <div className="flex items-center gap-3 mb-3">
+        <h2 className="text-2xl font-bold text-white tracking-tight">시장 지수</h2>
+        <span className="text-[11px] px-2 py-0.5 rounded-full bg-green-500/10 text-green-400 font-medium border border-green-500/20 flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+          LIVE
+        </span>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex overflow-x-auto gap-2 mb-6 pb-2 hide-scrollbar">
+        {[
+          { id: 'domestic', label: '국내증시' },
+          { id: 'global', label: '해외증시' },
+          { id: 'crypto', label: '디지털자산' },
+          { id: 'exchange', label: '환율' },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id as TabType)}
+            className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${activeTab === tab.id
+              ? 'bg-gray-700 text-white shadow-lg ring-1 ring-gray-600'
+              : 'bg-gray-800/50 text-gray-500 hover:text-gray-300 hover:bg-gray-800'
+              }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Carousel Container (Desktop & Mobile) */}
+      <div className="relative group">
+        {/* Desktop Navigation Buttons */}
+        {/* Desktop Navigation Buttons */}
+        <AnimatePresence>
+          {showLeft && (
+            <motion.button
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8, transition: { duration: 0.1 } }}
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={() => {
+                scrollContainerRef.current?.scrollBy({ left: -300, behavior: 'smooth' })
+                setTimeout(checkScroll, 100)
+                setTimeout(checkScroll, 300)
+              }}
+              className="hidden md:flex absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 z-20 w-10 h-10 bg-black/50 backdrop-blur-md rounded-full items-center justify-center border border-white/20 text-white transition-colors hover:bg-black/70 shadow-glow-white"
+            >
+              <ChevronLeft className="w-6 h-6" />
+            </motion.button>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {showRight && (
+            <motion.button
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8, transition: { duration: 0.1 } }}
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={() => {
+                scrollContainerRef.current?.scrollBy({ left: 300, behavior: 'smooth' })
+                setTimeout(checkScroll, 100)
+                setTimeout(checkScroll, 300)
+              }}
+              className="hidden md:flex absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 z-20 w-10 h-10 bg-black/50 backdrop-blur-md rounded-full items-center justify-center border border-white/20 text-white transition-colors hover:bg-black/70 shadow-glow-white"
+            >
+              <ChevronRight className="w-6 h-6" />
+            </motion.button>
+          )}
+        </AnimatePresence>
+
+        <div
+          ref={scrollContainerRef}
+          onScroll={checkScroll}
+          className="flex overflow-x-auto snap-x snap-mandatory gap-4 pb-4 hide-scrollbar scroll-smooth"
+        >
+          <AnimatePresence mode='popLayout'>
+            {visibleIndices.map((index) => (
+              <MarketIndexCard key={index.symbol} index={index} />
+            ))}
+          </AnimatePresence>
+        </div>
+
+
+      </div>
+
+      <style jsx global>{`
+        .hide-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+        .hide-scrollbar {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+      `}</style>
+    </div >
+  )
+}
+
+// Fixed AreaChart import for sexy look
+import { AreaChart, Area } from 'recharts'

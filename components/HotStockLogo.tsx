@@ -1,22 +1,27 @@
 import { Flame } from 'lucide-react'
+import { motion } from 'framer-motion'
 
 interface HotStockLogoProps {
   size?: 'sm' | 'md' | 'lg'
   showText?: boolean
+  animated?: boolean
 }
 
-export default function HotStockLogo({ size = 'md', showText = true }: HotStockLogoProps) {
+export default function HotStockLogo({ size = 'md', showText = true, animated = true }: HotStockLogoProps) {
   const sizeClasses = {
     sm: {
-      icon: 'w-5 h-5',
+      icon: 20,
+      container: 'w-5 h-5',
       text: 'text-lg',
     },
     md: {
-      icon: 'w-6 h-6',
+      icon: 24,
+      container: 'w-6 h-6',
       text: 'text-xl',
     },
     lg: {
-      icon: 'w-10 h-10',
+      icon: 40,
+      container: 'w-10 h-10',
       text: 'text-3xl',
     }
   }
@@ -25,18 +30,62 @@ export default function HotStockLogo({ size = 'md', showText = true }: HotStockL
 
   return (
     <div className="flex items-center gap-2 group cursor-pointer select-none">
-      <div className="relative flex items-center justify-center">
-        {/* Outer Glow */}
-        <div className="absolute inset-0 bg-orange-500/20 rounded-full blur-xl group-hover:bg-orange-500/30 transition-all duration-500" />
+      <div className={`relative flex items-center justify-center ${currentSize.container}`}>
+        {/* Outer Glow - Pulsing */}
+        <motion.div
+          animate={animated ? {
+            opacity: [0.3, 0.6, 0.3],
+            scale: [1, 1.2, 1],
+          } : {}}
+          transition={{
+            duration: 3,
+            repeat: Infinity,
+            ease: "easeInOut"
+          }}
+          className="absolute inset-0 bg-orange-500/40 rounded-full blur-xl"
+        />
 
         {/* Core Flame */}
-        <div className="relative animate-float">
-          <Flame
-            className={`${currentSize.icon} text-orange-500 fill-orange-500 animate-flame filter drop-shadow-[0_0_8px_rgba(249,115,22,0.6)]`}
-            strokeWidth={2.5}
+        <div className="relative z-10">
+          <motion.div
+            animate={animated ? {
+              scale: [1, 1.1, 0.95, 1.05, 1],
+              rotate: [0, 2, -2, 1, 0],
+              filter: [
+                'brightness(1)',
+                'brightness(1.2)',
+                'brightness(1.1)',
+                'brightness(1)'
+              ]
+            } : {}}
+            transition={{
+              duration: 2,
+              repeat: Infinity,
+              ease: "easeInOut",
+              times: [0, 0.2, 0.5, 0.8, 1]
+            }}
+            className="text-orange-500 drop-shadow-[0_0_8px_rgba(249,115,22,0.8)]"
+          >
+            <Flame
+              size={currentSize.icon}
+              fill="currentColor"
+              strokeWidth={2.5}
+            />
+          </motion.div>
+
+          {/* Inner Core Spark - Intense heat center */}
+          <motion.div
+            animate={animated ? {
+              opacity: [0.8, 1, 0.8],
+              scale: [1, 1.1, 1],
+            } : {}}
+            transition={{
+              duration: 0.5,
+              repeat: Infinity,
+              repeatType: "reverse"
+            }}
+            className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-yellow-100 rounded-full blur-[1px]"
           />
-          {/* Inner Spark */}
-          <div className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-yellow-200 rounded-full blur-[1px] animate-pulse" />
         </div>
       </div>
 

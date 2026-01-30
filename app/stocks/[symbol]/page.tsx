@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import StockDetailClient from './StockDetailClient'
+import { getRealTimeQuote } from '@/lib/stock-service'
 
 export default async function StockDetailPage(props: { params: Promise<{ symbol: string }> }) {
   const params = await props.params
@@ -23,5 +24,8 @@ export default async function StockDetailPage(props: { params: Promise<{ symbol:
     )
   }
 
-  return <StockDetailClient symbol={params.symbol} stock={stock} />
+  // Fetch real-time data
+  const realTimeStock = await getRealTimeQuote(stock)
+
+  return <StockDetailClient symbol={params.symbol} stock={realTimeStock} />
 }
