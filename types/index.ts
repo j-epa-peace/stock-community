@@ -26,6 +26,7 @@ export type User = {
 export type Comment = {
     id: string
     content: string
+    postId: string
     parentId: string | null
     createdAt: string
     user: {

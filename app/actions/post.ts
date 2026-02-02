@@ -206,23 +206,19 @@ export async function toggleLike(postId: string) {
         const currentUser = await getCurrentUser()
         if (!currentUser) return { error: '로그인이 필요합니다' }
 
-        const existingLike = await prisma.like.findUnique({
+        // Use findFirst to safely handle nullable commentId in query
+        const existingLike = await prisma.like.findFirst({
             where: {
-                userId_postId: {
-                    userId: currentUser.userId,
-                    postId
-                }
+                userId: currentUser.userId,
+                postId: postId,
+                commentId: null
             }
         })
 
         if (existingLike) {
             await prisma.like.delete({
                 where: {
-                    userId_postId_commentId: {
-                        userId: currentUser.userId,
-                        postId,
-                        commentId: null
-                    }
+                    id: existingLike.id
                 }
             })
             // Decrease reputation
