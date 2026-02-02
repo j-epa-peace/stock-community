@@ -24,7 +24,14 @@ export async function createComment(data: { postId: string; content: string; par
             }
         })
 
-        return { success: true, comment }
+        return {
+            success: true,
+            comment: {
+                ...comment,
+                createdAt: comment.createdAt.toISOString(),
+                updatedAt: comment.updatedAt.toISOString()
+            }
+        }
     } catch (error) {
         console.error('Create comment error:', error)
         return { error: '댓글 작성에 실패했습니다' }
@@ -44,7 +51,13 @@ export async function getComments(postId: string) {
             }
         })
 
-        return { success: true, comments }
+        const serializedComments = comments.map(comment => ({
+            ...comment,
+            createdAt: comment.createdAt.toISOString(),
+            updatedAt: comment.updatedAt.toISOString()
+        }))
+
+        return { success: true, comments: serializedComments }
     } catch (error) {
         console.error('Get comments error:', error)
         return { error: '댓글을 불러오는데 실패했습니다' }

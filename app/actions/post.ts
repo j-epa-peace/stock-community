@@ -73,7 +73,14 @@ export async function createPost(data: {
         })
 
         revalidatePath(`/stocks/${targetSymbol}`)
-        return { success: true, post }
+        return {
+            success: true,
+            post: {
+                ...post,
+                createdAt: post.createdAt.toISOString(),
+                updatedAt: post.updatedAt.toISOString()
+            }
+        }
     } catch (error) {
         console.error('Create post error:', error)
         return { error: '게시글 작성에 실패했습니다' }
@@ -132,10 +139,14 @@ export async function getPosts(
         // Process posts to add isLiked flag
         const processedPosts = posts.map(post => ({
             ...post,
+            createdAt: post.createdAt.toISOString(),
+            updatedAt: post.updatedAt.toISOString(),
             isLiked: currentUser ? post.likes.some((like: any) => like.userId === currentUser.userId) : false,
             likes: post._count.likes,
             comments: post.comments.map((comment: any) => ({
                 ...comment,
+                createdAt: comment.createdAt.toISOString(),
+                updatedAt: comment.updatedAt.toISOString(),
                 isLiked: currentUser ? comment.likes.some((like: any) => like.userId === currentUser.userId) : false,
                 likes: comment.likes.length
             }))
@@ -279,8 +290,18 @@ export async function getUserActivity() {
 
         // Combine and label them
         const activity = [
-            ...posts.map(p => ({ ...p, type: 'post' as const })),
-            ...comments.map(c => ({ ...c, type: 'comment' as const }))
+            ...posts.map(p => ({
+                ...p,
+                type: 'post' as const,
+                createdAt: p.createdAt.toISOString(),
+                updatedAt: p.updatedAt.toISOString()
+            })),
+            ...comments.map(c => ({
+                ...c,
+                type: 'comment' as const,
+                createdAt: c.createdAt.toISOString(),
+                updatedAt: c.updatedAt.toISOString()
+            }))
         ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 
         return { success: true, activity }
