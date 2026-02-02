@@ -35,7 +35,9 @@ export async function GET() {
                     // 2. 당일 차트 데이터 가져오기 (1일, 1분 간격)
                     // 'range' 옵션 유효성 검사 실패 시 'period1' 사용
                     const period1 = new Date()
-                    period1.setDate(period1.getDate() - 3) // 3일 전 (최신 데이터 확보용으로 충분)
+                    // 1m data is usually available for last 7 days.
+                    // We need max range to cover long holidays (like Lunar New Year).
+                    period1.setDate(period1.getDate() - 7)
 
                     const queryOptions = {
                         period1: period1.toISOString(),
