@@ -47,7 +47,7 @@ export async function GET() {
 
                     // Fetch Chart and Quote independently to ensure Quote displays even if Chart fails
                     const [chartDataResult, quoteData] = await Promise.all([
-                        yahooFinance.chart(symbol.ticker, queryOptions).catch(e => {
+                        yahooFinance.chart(symbol.ticker, queryOptions).catch((e: any) => {
                             console.error(`Chart fetch failed for ${symbol.ticker}:`, e)
                             return { quotes: [], meta: {} }
                         }) as any,
