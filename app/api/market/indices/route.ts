@@ -35,7 +35,7 @@ export async function GET() {
                     // 2. 당일 차트 데이터 가져오기 (1일, 1분 간격)
                     // 'range' 옵션 유효성 검사 실패 시 'period1' 사용
                     const period1 = new Date()
-                    period1.setDate(period1.getDate() - 7) // 7일 전 (주말/휴일 고려 넉넉하게)
+                    period1.setDate(period1.getDate() - 3) // 3일 전 (최신 데이터 확보용으로 충분)
 
                     const queryOptions = {
                         period1: period1.toISOString(),
@@ -54,13 +54,9 @@ export async function GET() {
                     // 데이터 매핑 및 최신 거래일 하루치만 필터링
                     const quotes = chartData.quotes || []
 
-                    // 1. 데이터가 있는 날짜들 확인
-                    const dates = quotes.map((q: any) => new Date(q.date).toDateString())
-                    const uniqueDates = Array.from(new Set(dates))
-                    const latestDate = uniqueDates[uniqueDates.length - 1] // 가장 최근 날짜
-
-                    // 최근 날짜가 없으면 빈 배열
-                    if (!latestDate) {
+                    // 1. 가장 마지막 데이터의 날짜를 기준으로 필터링 (UTC 기준 날짜 비교)
+                    // Server Timezone Issue 방지를 위해 toDateString() 대신 YYYY-MM-DD 문자열 직접 비교
+                    if (quotes.length === 0) {
                         return {
                             name: symbol.name,
                             symbol: symbol.ticker,
@@ -72,9 +68,16 @@ export async function GET() {
                         }
                     }
 
+                    const lastQuoteDate = new Date(quotes[quotes.length - 1].date)
+                    const lastDateStr = `${lastQuoteDate.getUTCFullYear()}-${lastQuoteDate.getUTCMonth()}-${lastQuoteDate.getUTCDate()}`
+
                     // 2. 가장 최근 날짜의 데이터만 필터링 (장중이면 오픈~현재)
                     const history = quotes
-                        .filter((item: any) => new Date(item.date).toDateString() === latestDate)
+                        .filter((item: any) => {
+                            const d = new Date(item.date)
+                            const dStr = `${d.getUTCFullYear()}-${d.getUTCMonth()}-${d.getUTCDate()}`
+                            return dStr === lastDateStr
+                        })
                         .map((item: any) => ({
                             time: new Date(item.date).getTime(),
                             value: item.close
