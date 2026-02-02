@@ -68,7 +68,7 @@ export async function GET(request: Request) {
 
         const serializedStocks = topGainers.map(stock => ({
             ...stock,
-            marketCap: stock.marketCap ? stock.marketCap.toString() : null
+            marketCap: (stock as any).marketCap ? (stock as any).marketCap.toString() : null
         }))
 
         return NextResponse.json({
