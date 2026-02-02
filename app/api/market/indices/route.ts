@@ -41,16 +41,22 @@ export async function GET() {
 
                     const queryOptions = {
                         period1: period1.toISOString(),
-                        interval: '1m',
-                        includePrePost: true
+                        interval: '5m'
+                        // includePrePost removed for Indices stability
                     } as any
-                    // Fetch both Chart and Quote for accuracy
-                    const [chartData, quoteData] = await Promise.all([
-                        yahooFinance.chart(symbol.ticker, queryOptions) as any,
+
+                    // Fetch Chart and Quote independently to ensure Quote displays even if Chart fails
+                    const [chartDataResult, quoteData] = await Promise.all([
+                        yahooFinance.chart(symbol.ticker, queryOptions).catch(e => {
+                            console.error(`Chart fetch failed for ${symbol.ticker}:`, e)
+                            return { quotes: [], meta: {} }
+                        }) as any,
                         yahooFinance.quote(symbol.ticker)
                     ])
 
-                    const quote = chartData.meta
+                    // Handle case where chart fetch returned fallback object
+                    const chartData = chartDataResult || { quotes: [], meta: {} }
+                    const quote = chartData.meta || {}
                     const realPreviousClose = quoteData.regularMarketPreviousClose || quote.chartPreviousClose || quote.previousClose
 
                     // 데이터 매핑 및 최신 거래일 하루치만 필터링
@@ -59,13 +65,14 @@ export async function GET() {
                     // 1. 가장 마지막 데이터의 날짜를 기준으로 필터링 (UTC 기준 날짜 비교)
                     // Server Timezone Issue 방지를 위해 toDateString() 대신 YYYY-MM-DD 문자열 직접 비교
                     if (quotes.length === 0) {
+                        // Return valid quote even if chart is empty
                         return {
                             name: symbol.name,
                             symbol: symbol.ticker,
-                            value: quoteData.regularMarketPrice || quote.regularMarketPrice,
-                            change: quoteData.regularMarketChange || quote.regularMarketChange,
-                            changePercent: quoteData.regularMarketChangePercent || quote.regularMarketChangePercent,
-                            previousClose: realPreviousClose,
+                            value: quoteData.regularMarketPrice || quote.regularMarketPrice || 0,
+                            change: quoteData.regularMarketChange || quote.regularMarketChange || 0,
+                            changePercent: quoteData.regularMarketChangePercent || quote.regularMarketChangePercent || 0,
+                            previousClose: realPreviousClose || 0,
                             data: []
                         }
                     }
