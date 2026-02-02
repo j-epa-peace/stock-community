@@ -39,20 +39,32 @@ export async function GET() {
                     // We need max range to cover long holidays (like Lunar New Year).
                     period1.setDate(period1.getDate() - 7)
 
-                    const queryOptions = {
-                        period1: period1.toISOString(),
-                        interval: '5m'
-                        // includePrePost removed for Indices stability
-                    } as any
+                    // Helper to fetch data with specific interval
+                    const fetchWithInterval = async (interval: '1m' | '5m' | '60m') => {
+                        const queryOptions = {
+                            period1: period1.toISOString(),
+                            interval: interval,
+                            includePrePost: false
+                        } as any
+                        return yahooFinance.chart(symbol.ticker, queryOptions).catch(() => ({ quotes: [], meta: {} })) as any
+                    }
 
-                    // Fetch Chart and Quote independently to ensure Quote displays even if Chart fails
-                    const [chartDataResult, quoteData] = await Promise.all([
-                        yahooFinance.chart(symbol.ticker, queryOptions).catch((e: any) => {
-                            console.error(`Chart fetch failed for ${symbol.ticker}:`, e)
-                            return { quotes: [], meta: {} }
-                        }) as any,
-                        yahooFinance.quote(symbol.ticker)
-                    ])
+                    // 1. Try 1m interval first (Best Resolution)
+                    let chartDataResult = await fetchWithInterval('1m')
+
+                    // 2. Fallback to 5m if 1m returns empty
+                    if (!chartDataResult.quotes || chartDataResult.quotes.length === 0) {
+                        // console.log(`Fallback to 5m for ${symbol.ticker}`)
+                        chartDataResult = await fetchWithInterval('5m')
+                    }
+
+                    // 3. Fallback to 60m (1h) if 5m also fails (Maximum Robustness)
+                    if (!chartDataResult.quotes || chartDataResult.quotes.length === 0) {
+                        // console.log(`Fallback to 60m for ${symbol.ticker}`)
+                        chartDataResult = await fetchWithInterval('60m')
+                    }
+
+                    const quoteData = await yahooFinance.quote(symbol.ticker)
 
                     // Handle case where chart fetch returned fallback object
                     const chartData = chartDataResult || { quotes: [], meta: {} }

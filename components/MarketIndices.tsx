@@ -48,63 +48,62 @@ const MarketIndexCard = ({ index }: { index: MarketIndex }) => {
   const safeId = index.symbol.replace(/[^a-zA-Z0-9]/g, '')
 
   // Calculate Fixed Domain for "Live" feel
-  let domainStart = 'dataMin' as any
-  let domainEnd = 'dataMax' as any
+  let domainStart: number | 'dataMin' = 'dataMin'
+  let domainEnd: number | 'dataMax' = 'dataMax'
 
   if (index.data.length > 0) {
-    const firstPoint = index.data[0].time
-    const date = new Date(firstPoint)
-
-    // Determine Market Hours based on index name
-    // KR: 09:00 - 15:30 KST
-    // US: 09:30 - 16:00 EST (approx for simplicity, or just use 6.5h duration)
-    // Crypto: 24h (don't fix)
+    const lastPoint = index.data[index.data.length - 1].time
+    const date = new Date(lastPoint) // Base date from the data
 
     const isCrypto = ['Bitcoin', 'Ethereum'].some(s => index.name.includes(s))
     const isUS = ['NASDAQ', 'S&P 500'].some(s => index.name.includes(s))
     const isKR = ['KOSPI', 'KOSDAQ'].some(s => index.name.includes(s)) || index.name.includes('KRW')
+    const isCN = ['Shanghai', 'CNY'].some(s => index.name.includes(s))
+    const isJP = ['Nikkei'].some(s => index.name.includes(s))
 
     if (!isCrypto) {
-      const startDate = new Date(date)
-      const endDate = new Date(date)
-
       if (isKR) {
-        startDate.setHours(9, 0, 0, 0)
-        endDate.setHours(15, 30, 0, 0)
+        // KR: 09:00 - 15:30 KST
+        const open = new Date(lastPoint)
+        open.setHours(9, 0, 0, 0)
+        const close = new Date(lastPoint)
+        close.setHours(15, 30, 0, 0)
+
+        // Handle case where specific data date might be different day due to timezone, 
+        // essentially we trust the 'lastPoint' is the correct "Day" in local time.
+        // But 'new Date(timestamp)' uses Local Device Time. This is a CLIENT COMPONENT.
+        // To be safe, we just want the span to be 6.5 hours.
+        // We anchor 'domainStart' to the first data point's "Floor to Hour" or explicitly reset hours if we can.
+        // Best approach for client side: Use the first data point of the day as 'Open' approximation for start?
+        // No, user wants FIXED axis.
+
+        // Use the Data's Start as 09:00 (if it's close enough)
+        // Simplest fixed visual: 
+        // Just take the Start timestamp of the day (09:00 KST) and End (15:30 KST).
+        // Problem: 'new Date()' on client might be EST.
+        // We need to work with relative offsets or timestamps.
+
+        // Let's assume the data is correct.
+        // We want the chart to start at [FirstDataPoint (Open)] and end at [FirstDataPoint + MarketDuration]
+        const firstData = index.data[0].time
+        domainStart = firstData
+        domainEnd = firstData + (6.5 * 60 * 60 * 1000) // 6.5 Hours fixed width
       } else if (isUS) {
-        // Assuming the timestamp is already correct UTC, we just need to span 6.5 hours from start
-        // But simple way: Start from first data point (Open) and add 6.5 hours
-        // Actually, US market is 9:30 - 16:00.
-        // Let's rely on data[0] being roughly Open time.
-        // Better: Set specific hours if we know the timezone of the timestamp.
-        // Yahoo Finance timestamps are UTC.
-        // KR Open: 00:00 UTC (9:00 KST) -> Close 06:30 UTC
-        // US Open: 13:30 UTC (9:30 ET) -> Close 20:00 UTC
-
-        // Let's just take the first data point time as 'Open' and set End to Open + Duration
-        const marketDuration = isKR ? 6.5 * 60 * 60 * 1000 : 6.5 * 60 * 60 * 1000
-        startDate.setTime(firstPoint) // Trust the data start
-
-        // Align start to nearest previous hour/half-hour to be safe? 
-        // No, just trust that data[0] is near open.
-        // Actually, let's fix start time to 09:00 KST for KR explicitly for "emptiness" before 9am if any
-        if (isKR) {
-          // Convert first point to KST date object manually to reset hours
-          // Just use the timestamp math for simplicity. 
-          // If we assume the data provided is "Single Day Intraday", 
-          // we can just set domainEnd to domainStart + MarketDuration.
-          domainStart = firstPoint
-          domainEnd = firstPoint + marketDuration // 6.5 hours later
-        } else if (isUS) {
-          domainStart = firstPoint
-          domainEnd = firstPoint + (6.5 * 60 * 60 * 1000)
-        }
+        // US: 09:30 - 16:00 (6.5 Hours)
+        const firstData = index.data[0].time
+        domainStart = firstData
+        domainEnd = firstData + (6.5 * 60 * 60 * 1000)
+      } else if (isCN) {
+        // CN: 09:30 - 15:00 (5.5 Hours) - often has lunch break but we ignore valid empty gap
+        const firstData = index.data[0].time
+        domainStart = firstData
+        domainEnd = firstData + (5.5 * 60 * 60 * 1000)
+      } else if (isJP) {
+        // JP: 09:00 - 15:00 (6 Hours)
+        const firstData = index.data[0].time
+        domainStart = firstData
+        domainEnd = firstData + (6 * 60 * 60 * 1000)
       }
-
-      // If current last data point is BEFORE domainEnd, we use domainEnd to show empty space.
-      // If data goes beyond (extended trading?), we let it auto-expand or clamp?
-      // The user wants to see "empty space" until 15:30.
-      // So `domain={[domainStart, domainEnd]}` is correct.
     }
   }
 
@@ -173,7 +172,7 @@ const MarketIndexCard = ({ index }: { index: MarketIndex }) => {
               <XAxis
                 dataKey="time"
                 type="number"
-                domain={['dataMin', 'auto']}
+                domain={[domainStart, domainEnd]}
                 ticks={ticks}
                 tickFormatter={(t) => formatTime(t, index.name)}
                 tick={{ fill: '#9ca3af', fontSize: 11, fontWeight: 500 }}
