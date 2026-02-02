@@ -2,8 +2,12 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Plus } from 'lucide-react'
+import { Plus, ArrowRightLeft } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
+
+import { Stock } from '@/types'
+
+import { formatStockPrice } from '@/lib/utils'
 
 interface WatchlistItem {
   id: string
@@ -11,18 +15,13 @@ interface WatchlistItem {
   stockName: string
 }
 
-interface StockData {
-  symbol: string
-  price: number
-  change: number
-  changePercent: number
-}
-
 export default function WatchlistSection() {
   const { user, loading: authLoading } = useAuth()
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>([])
-  const [stockData, setStockData] = useState<Record<string, StockData>>({})
+  const [stockData, setStockData] = useState<Record<string, Stock>>({})
   const [dataLoading, setDataLoading] = useState(true)
+  const [isKrw, setIsKrw] = useState(true)
+
 
   useEffect(() => {
     const fetchData = async () => {
@@ -55,13 +54,19 @@ export default function WatchlistSection() {
             const stocksData = await stocksRes.json()
 
             if (stocksData.success) {
-              const fromDb: Record<string, StockData> = {}
-                ; (stocksData.stocks as StockData[]).forEach((s) => {
+              const fromDb: Record<string, Stock> = {}
+                ; (stocksData.stocks as Stock[]).forEach((s) => {
+                  // Index by both original and normalized symbol
                   fromDb[s.symbol] = {
                     symbol: s.symbol,
+                    name: s.name,
                     price: s.price,
                     change: s.change,
-                    changePercent: s.changePercent
+                    changePercent: s.changePercent,
+                    market: s.market // Ensure market is passed
+                  }
+                  if (s.symbol.includes('.KS')) {
+                    fromDb[s.symbol.replace('.KS', '')] = fromDb[s.symbol]
                   }
                 })
               setStockData(fromDb)
@@ -133,19 +138,32 @@ export default function WatchlistSection() {
     <div className="bg-white/5 backdrop-blur-xl rounded-3xl shadow-glass p-6 mb-8 border border-white/10">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-white tracking-tight">내 관심종목</h2>
-        <Link
-          href="/watchlist/add"
-          className="inline-flex items-center text-gray-400 hover:text-white hover:bg-white/10 px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-300 border border-transparent hover:border-white/10 hover:shadow-glow-white"
-        >
-          <Plus className="h-4 w-4 mr-1" />
-          더 추가
-        </Link>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setIsKrw(!isKrw)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs text-gray-400 hover:text-white hover:bg-white/10 transition-all font-medium"
+          >
+            <ArrowRightLeft className="w-3 h-3" />
+            {isKrw ? '원화' : 'USD'}
+          </button>
+          <Link
+            href="/watchlist/add"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs text-gray-400 hover:text-white hover:bg-white/10 transition-all font-medium ml-2"
+          >
+            + 관리
+          </Link>
+        </div>
       </div>
 
       <div className="space-y-4">
         {watchlist.slice(0, 5).map((item) => {
           const stock = stockData[item.stockSymbol]
-          if (!stock) return null
+
+          // Fallback if stock data is missing/loading
+          const price = stock ? stock.price : 0
+          const change = stock ? stock.change : 0
+          const changePercent = stock ? stock.changePercent : 0
+          const isLoading = !stock
 
           return (
             <Link
@@ -156,27 +174,27 @@ export default function WatchlistSection() {
               <div className="flex justify-between items-center p-4 border border-white/5 rounded-2xl hover:bg-white/10 bg-white/5 transition-all duration-300 hover:border-white/20 hover:shadow-[0_0_15px_rgba(255,255,255,0.05)]">
                 <div>
                   <h3 className="font-bold text-white transition-colors">{item.stockName}</h3>
-                  <p className="text-sm text-gray-500 font-medium">{item.stockSymbol}</p>
+                  <p className="text-sm text-gray-500 font-medium">{item.stockSymbol.replace('.KS', '')}</p>
                 </div>
                 <div className="text-right">
-                  <p className="font-bold text-white text-lg tracking-tight">
-                    {item.stockSymbol.includes('.') || item.stockSymbol.length <= 4
-                      ? `$${stock.price.toFixed(2)}`
-                      : `${stock.price.toLocaleString()}원`}
-                  </p>
-                  <div className="flex items-center justify-end space-x-2">
-                    <span className={`text-sm font-bold ${stock.change >= 0 ? 'text-red-400' : 'text-blue-400'
-                      }`}>
-                      {stock.change >= 0 ? '+' : ''}
-                      {item.stockSymbol.includes('.') || item.stockSymbol.length <= 4
-                        ? stock.change.toFixed(2)
-                        : Math.round(stock.change).toLocaleString()}
-                    </span>
-                    <span className={`text-xs font-medium px-1.5 py-0.5 rounded bg-opacity-20 ${stock.changePercent >= 0 ? 'bg-red-500 text-red-500' : 'bg-blue-500 text-blue-500'
-                      }`}>
-                      {stock.changePercent >= 0 ? '+' : ''}{stock.changePercent.toFixed(2)}%
-                    </span>
-                  </div>
+                  {isLoading ? (
+                    <div className="h-8 w-24 bg-white/10 animate-pulse rounded" />
+                  ) : (
+                    <>
+                      <p className="font-bold text-white text-lg tracking-tight">
+                        {formatStockPrice(price, stock?.market || 'KOSPI', isKrw ? 'KRW' : 'USD')}
+                      </p>
+                      <div className="flex items-center justify-end space-x-2">
+                        <span className={`text-sm font-bold ${change >= 0 ? 'text-red-400' : 'text-blue-400'}`}>
+                          {change >= 0 ? '+' : ''}
+                          {formatStockPrice(Math.abs(change), stock?.market || 'KOSPI', isKrw ? 'KRW' : 'USD').replace(/[^0-9.,]/g, '')}
+                        </span>
+                        <span className={`text-xs font-medium px-1.5 py-0.5 rounded bg-opacity-20 ${changePercent >= 0 ? 'bg-red-500 text-red-500' : 'bg-blue-500 text-blue-500'}`}>
+                          {changePercent >= 0 ? '+' : ''}{changePercent.toFixed(2)}%
+                        </span>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             </Link>

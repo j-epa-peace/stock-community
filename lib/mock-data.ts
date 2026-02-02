@@ -83,7 +83,47 @@ export const marketIndices = [
 ]
 
 // Top 15 companies for watchlist selection
-export const topCompanies = [
+// Recommended Domestic Stocks
+export const recommendedDomestic = [
+  {
+    symbol: '005930',
+    name: '삼성전자',
+    englishName: 'Samsung Electronics',
+    logo: '/images/samsung.svg?v=1',
+    color: '#1428A0'
+  },
+  {
+    symbol: '000660',
+    name: 'SK하이닉스',
+    englishName: 'SK Hynix',
+    logo: '/images/sk.svg?v=1',
+    color: '#DB0025'
+  },
+  {
+    symbol: '035420',
+    name: 'NAVER',
+    englishName: 'NAVER',
+    logo: '/images/naver.svg?v=1',
+    color: '#03C75A'
+  },
+  {
+    symbol: '035720',
+    name: '카카오',
+    englishName: 'Kakao',
+    logo: '/images/kakao.svg?v=1',
+    color: '#FEE500'
+  },
+  {
+    symbol: '005380',
+    name: '현대차',
+    englishName: 'Hyundai Motor',
+    logo: '/images/hyundai.svg?v=1',
+    color: '#002C5F'
+  }
+]
+
+// Recommended Global Stocks
+export const recommendedGlobal = [
   {
     symbol: 'AAPL',
     name: '애플',
@@ -99,32 +139,11 @@ export const topCompanies = [
     color: '#00BCF2'
   },
   {
-    symbol: 'GOOGL',
-    name: '구글',
-    englishName: 'Alphabet Inc.',
-    logo: '/images/googl.svg?v=1',
-    color: '#4285F4'
-  },
-  {
-    symbol: 'AMZN',
-    name: '아마존',
-    englishName: 'Amazon.com Inc.',
-    logo: '/images/amzn.svg?v=1',
-    color: '#FF9900'
-  },
-  {
     symbol: 'TSLA',
     name: '테슬라',
     englishName: 'Tesla Inc.',
     logo: '/images/tsla.svg?v=1',
     color: '#CC0000'
-  },
-  {
-    symbol: 'META',
-    name: '메타',
-    englishName: 'Meta Platforms Inc.',
-    logo: '/images/meta.svg?v=1',
-    color: '#1877F2'
   },
   {
     symbol: 'NVDA',
@@ -134,53 +153,18 @@ export const topCompanies = [
     color: '#76B900'
   },
   {
-    symbol: 'NFLX',
-    name: '넷플릭스',
-    englishName: 'Netflix Inc.',
-    logo: '/images/nflx.svg?v=1',
-    color: '#E50914'
+    symbol: 'AMZN',
+    name: '아마존',
+    englishName: 'Amazon.com Inc.',
+    logo: '/images/amzn.svg?v=1',
+    color: '#FF9900'
   },
   {
-    symbol: 'ADBE',
-    name: '어도비',
-    englishName: 'Adobe Inc.',
-    logo: '/images/adbe.svg?v=1',
-    color: '#FF0000'
-  },
-  {
-    symbol: 'CRM',
-    name: '세일즈포스',
-    englishName: 'Salesforce Inc.',
-    logo: '/images/crm.svg?v=1',
-    color: '#00A1E0'
-  },
-  {
-    symbol: '005930.KS',
-    name: '삼성전자',
-    englishName: 'Samsung Electronics',
-    logo: '/images/samsung.svg?v=1',
-    color: '#1428A0'
-  },
-  {
-    symbol: 'BABA',
-    name: '알리바바',
-    englishName: 'Alibaba Group',
-    logo: '/images/baba.svg?v=1',
-    color: '#FF6A00'
-  },
-  {
-    symbol: 'V',
-    name: '비자',
-    englishName: 'Visa Inc.',
-    logo: '/images/v.svg?v=1',
-    color: '#1A1F71'
-  },
-  {
-    symbol: 'JPM',
-    name: 'JP모건',
-    englishName: 'JPMorgan Chase',
-    logo: '/images/jpm.svg?v=1',
-    color: '#0066B2'
+    symbol: 'GOOGL',
+    name: '구글',
+    englishName: 'Alphabet Inc.',
+    logo: '/images/googl.svg?v=1',
+    color: '#4285F4'
   },
   {
     symbol: 'JNJ',
@@ -188,6 +172,27 @@ export const topCompanies = [
     englishName: 'Johnson & Johnson',
     logo: '/images/jnj.svg?v=1',
     color: '#CC0000'
+  },
+  {
+    symbol: 'DIS',
+    name: '월트 디즈니',
+    englishName: 'The Walt Disney Company',
+    logo: '/images/dis.svg?v=1',
+    color: '#113CCF'
+  },
+  {
+    symbol: 'KO',
+    name: '코카콜라',
+    englishName: 'The Coca-Cola Company',
+    logo: '/images/ko.svg?v=1',
+    color: '#F40009'
+  },
+  {
+    symbol: 'PEP',
+    name: '펩시코',
+    englishName: 'PepsiCo Inc.',
+    logo: '/images/pep.svg?v=1',
+    color: '#22559E'
   }
 ]
 
@@ -203,11 +208,16 @@ export const fixedStockPrices: Record<string, { price: number; change: number; c
   'NFLX': { price: 423.89, change: -2.34, changePercent: -0.55 },
   'ADBE': { price: 567.23, change: 1.67, changePercent: 0.30 },
   'CRM': { price: 234.56, change: -3.21, changePercent: -1.35 },
-  '005930.KS': { price: 71800, change: 900, changePercent: 1.27 },
+  '005930': { price: 71800, change: 900, changePercent: 1.27 }, // Fixed key
   'BABA': { price: 89.45, change: -1.78, changePercent: -1.95 },
   'V': { price: 267.89, change: 0.45, changePercent: 0.17 },
   'JPM': { price: 156.78, change: 2.34, changePercent: 1.51 },
-  'JNJ': { price: 167.45, change: -0.67, changePercent: -0.40 }
+  'JNJ': { price: 167.45, change: -0.67, changePercent: -0.40 },
+  'AMD': { price: 134.56, change: 4.78, changePercent: 3.68 },
+  'DIS': { price: 92.50, change: -1.20, changePercent: -1.28 },
+  'KO': { price: 58.90, change: -0.34, changePercent: -0.57 },
+  'PEP': { price: 167.89, change: 1.45, changePercent: 0.87 },
+  'INTC': { price: 45.67, change: -1.23, changePercent: -2.62 }
 }
 
 export const getStockPrice = (symbol: string) => {

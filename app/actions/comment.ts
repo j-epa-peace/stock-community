@@ -3,7 +3,7 @@
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
 
-export async function createComment(data: { postId: string; content: string }) {
+export async function createComment(data: { postId: string; content: string; parentId?: string }) {
     try {
         const currentUser = await getCurrentUser()
         if (!currentUser) {
@@ -14,11 +14,12 @@ export async function createComment(data: { postId: string; content: string }) {
             data: {
                 content: data.content,
                 postId: data.postId,
-                userId: currentUser.userId
+                userId: currentUser.userId,
+                parentId: data.parentId || null
             },
             include: {
                 user: {
-                    select: { name: true, id: true }
+                    select: { name: true, id: true, reputation: true }
                 }
             }
         })
@@ -37,8 +38,9 @@ export async function getComments(postId: string) {
             orderBy: { createdAt: 'asc' },
             include: {
                 user: {
-                    select: { name: true, id: true }
-                }
+                    select: { name: true, id: true, reputation: true }
+                },
+                likes: true
             }
         })
 
@@ -93,5 +95,55 @@ export async function deleteComment(commentId: string) {
     } catch (error) {
         console.error('Delete comment error:', error)
         return { error: '댓글 삭제에 실패했습니다' }
+    }
+}
+
+export async function toggleCommentLike(commentId: string) {
+    try {
+        const currentUser = await getCurrentUser()
+        if (!currentUser) return { error: '로그인이 필요합니다' }
+
+        const existingLike = await prisma.like.findFirst({
+            where: {
+                userId: currentUser.userId,
+                commentId: commentId
+            }
+        })
+
+        if (existingLike) {
+            await prisma.like.delete({
+                where: {
+                    id: existingLike.id
+                }
+            })
+            // Decrease reputation
+            const comment = await prisma.comment.findUnique({ where: { id: commentId } })
+            if (comment && comment.userId !== currentUser.userId) {
+                await prisma.user.update({
+                    where: { id: comment.userId },
+                    data: { reputation: { decrement: 1 } }
+                })
+            }
+        } else {
+            await prisma.like.create({
+                data: {
+                    userId: currentUser.userId,
+                    commentId: commentId
+                }
+            })
+            // Increase reputation
+            const comment = await prisma.comment.findUnique({ where: { id: commentId } })
+            if (comment && comment.userId !== currentUser.userId) {
+                await prisma.user.update({
+                    where: { id: comment.userId },
+                    data: { reputation: { increment: 1 } }
+                })
+            }
+        }
+
+        return { success: true }
+    } catch (error) {
+        console.error('Toggle comment like error:', error)
+        return { error: '좋아요 처리에 실패했습니다' }
     }
 }

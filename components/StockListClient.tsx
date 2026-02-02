@@ -4,13 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 
-interface Stock {
-    symbol: string
-    name: string
-    price: number
-    change: number
-    changePercent: number
-}
+import { Stock } from '@/types'
 
 interface StockListGroup {
     id: string

@@ -20,6 +20,6 @@ export async function GET() {
     return NextResponse.json({ user })
   } catch (error) {
     console.error('Auth me error:', error)
-    return NextResponse.json({ user: null })
+    return NextResponse.json({ user: null, error: String(error) }, { status: 500 })
   }
 }

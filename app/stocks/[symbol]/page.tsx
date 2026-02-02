@@ -4,7 +4,7 @@ import { getRealTimeQuote } from '@/lib/stock-service'
 
 export default async function StockDetailPage(props: { params: Promise<{ symbol: string }> }) {
   const params = await props.params
-  const stock = await prisma.stock.findUnique({
+  let stock = await prisma.stock.findUnique({
     where: { symbol: params.symbol },
     select: {
       symbol: true,
@@ -15,6 +15,21 @@ export default async function StockDetailPage(props: { params: Promise<{ symbol:
       changePercent: true
     }
   })
+
+  // Fallback for Korean stocks (e.g. 005930 -> 005930.KS)
+  if (!stock && /^\d{6}$/.test(params.symbol)) {
+    stock = await prisma.stock.findUnique({
+      where: { symbol: `${params.symbol}.KS` },
+      select: {
+        symbol: true,
+        name: true,
+        market: true,
+        price: true,
+        change: true,
+        changePercent: true
+      }
+    })
+  }
 
   if (!stock) {
     return (

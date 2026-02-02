@@ -199,7 +199,8 @@ const nasdaqBase: StockSeed[] = [
   { symbol: 'GILD', name: '길리어드', price: 78.90, change: -0.89, changePercent: -1.12, market: 'NASDAQ' },
   { symbol: 'SBUX', name: '스타벅스', price: 98.76, change: 2.34, changePercent: 2.43, market: 'NASDAQ' },
   { symbol: 'MU', name: '마이크론', price: 89.45, change: 3.21, changePercent: 3.72, market: 'NASDAQ' },
-  { symbol: 'ADI', name: '아날로그디바이스', price: 189.34, change: -1.45, changePercent: -0.76, market: 'NASDAQ' }
+  { symbol: 'ADI', name: '아날로그디바이스', price: 189.34, change: -1.45, changePercent: -0.76, market: 'NASDAQ' },
+  { symbol: 'BABA', name: '알리바바', price: 74.32, change: -1.25, changePercent: -1.65, market: 'NASDAQ' }
 ]
 
 const kospiGenerated: StockSeed[] = [

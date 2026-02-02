@@ -35,7 +35,7 @@ export async function GET() {
                     // 2. 당일 차트 데이터 가져오기 (1일, 1분 간격)
                     // 'range' 옵션 유효성 검사 실패 시 'period1' 사용
                     const period1 = new Date()
-                    period1.setDate(period1.getDate() - 2) // 2일 전 (주말/휴일 고려 넉넉하게)
+                    period1.setDate(period1.getDate() - 7) // 7일 전 (주말/휴일 고려 넉넉하게)
 
                     const queryOptions = {
                         period1: period1.toISOString(),
@@ -59,11 +59,24 @@ export async function GET() {
                     const uniqueDates = Array.from(new Set(dates))
                     const latestDate = uniqueDates[uniqueDates.length - 1] // 가장 최근 날짜
 
-                    // 2. 가장 최근 날짜의 데이터만 필터링
+                    // 최근 날짜가 없으면 빈 배열
+                    if (!latestDate) {
+                        return {
+                            name: symbol.name,
+                            symbol: symbol.ticker,
+                            value: quoteData.regularMarketPrice || quote.regularMarketPrice,
+                            change: quoteData.regularMarketChange || quote.regularMarketChange,
+                            changePercent: quoteData.regularMarketChangePercent || quote.regularMarketChangePercent,
+                            previousClose: realPreviousClose,
+                            data: []
+                        }
+                    }
+
+                    // 2. 가장 최근 날짜의 데이터만 필터링 (장중이면 오픈~현재)
                     const history = quotes
                         .filter((item: any) => new Date(item.date).toDateString() === latestDate)
                         .map((item: any) => ({
-                            time: new Date(item.date).getTime(), // 타임스탬프(숫자)로 변환하여 선형 차트 적용
+                            time: new Date(item.date).getTime(),
                             value: item.close
                         }))
                         .filter((item: any) => item.value !== null && item.value !== undefined)
@@ -91,7 +104,7 @@ export async function GET() {
     } catch (error) {
         console.error('Market indices fetch error:', error)
         return NextResponse.json(
-            { error: 'Failed to fetch market indices' },
+            { error: 'Failed to fetch market indices', details: String(error) },
             { status: 500 }
         )
     }

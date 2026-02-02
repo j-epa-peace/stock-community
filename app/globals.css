@@ -11,6 +11,13 @@
     @apply bg-black text-white selection:bg-white/20;
     background-image: radial-gradient(circle at 50% 0%, #111827 0%, #000000 90%);
     background-attachment: fixed;
+    caret-color: transparent;
+  }
+
+  input,
+  textarea,
+  [contenteditable="true"] {
+    caret-color: auto;
   }
 }
 

@@ -7,12 +7,13 @@ import { revalidatePath } from 'next/cache'
 export async function createPost(data: {
     title: string
     content: string
-    stockSymbol: string
-    stockName: string
-    market: string
-    price: number
-    change: number
-    changePercent: number
+    symbol?: string      // From PostForm
+    stockSymbol?: string // Alternate
+    stockName?: string
+    market?: string
+    price?: number
+    change?: number
+    changePercent?: number
 }) {
     try {
         const currentUser = await getCurrentUser()
@@ -20,42 +21,58 @@ export async function createPost(data: {
             return { error: '로그인이 필요합니다' }
         }
 
-        // Ensure stock exists in DB (sync with latest data from client if needed, or just find)
-        // For simplicity, we assume the stock is already seeded or we upsert it.
-        // Since we did a seed, finding by symbol should work. 
-        // However, to be safe and robust (if we add new stocks dynamically), we can upsert.
-        // The client sends price info, so let's update the stock price while we are at it.
+        const targetSymbol = data.stockSymbol || data.symbol
+        if (!targetSymbol) return { error: '종목 정보가 없습니다' }
 
-        // Note: In a real app, price updates might happen via a separate background worker, 
-        // but here we can ensure the stock record exists.
-        const stock = await prisma.stock.upsert({
-            where: { symbol: data.stockSymbol },
-            create: {
-                symbol: data.stockSymbol,
-                name: data.stockName,
-                market: data.market,
-                price: data.price,
-                change: data.change,
-                changePercent: data.changePercent
-            },
-            update: {
-                // Update price info if needed, or keep latest
-                price: data.price,
-                change: data.change,
-                changePercent: data.changePercent
+        // 1. Try to find stock in DB
+        let stock = await prisma.stock.findFirst({
+            where: {
+                OR: [
+                    { symbol: targetSymbol },
+                    { symbol: `${targetSymbol}.KS` }
+                ]
             }
         })
+
+        // 2. If not found, check if we have enough info to create it
+        if (!stock) {
+            if (data.stockName && data.market && data.price !== undefined) {
+                stock = await prisma.stock.create({
+                    data: {
+                        symbol: targetSymbol, // Use as provided
+                        name: data.stockName,
+                        market: data.market,
+                        price: data.price,
+                        change: data.change || 0,
+                        changePercent: data.changePercent || 0
+                    }
+                })
+            } else {
+                return { error: '종목 정보를 찾을 수 없습니다. (DB 미등록)' }
+            }
+        }
+        // 3. If found and we have new data, update it (optional, but good for keeping price fresh)
+        else if (data.price !== undefined) {
+            await prisma.stock.update({
+                where: { id: stock.id },
+                data: {
+                    price: data.price,
+                    change: data.change,
+                    changePercent: data.changePercent
+                }
+            })
+        }
 
         const post = await prisma.post.create({
             data: {
                 title: data.title,
                 content: data.content,
                 userId: currentUser.userId,
-                stockId: stock.id
+                stockId: stock!.id
             }
         })
 
-        revalidatePath(`/stocks/${data.stockSymbol}`)
+        revalidatePath(`/stocks/${targetSymbol}`)
         return { success: true, post }
     } catch (error) {
         console.error('Create post error:', error)
@@ -63,7 +80,12 @@ export async function createPost(data: {
     }
 }
 
-export async function getPosts(symbol: string) {
+export async function getPosts(
+    symbol: string,
+    page: number = 1,
+    limit: number = 10,
+    sort: 'latest' | 'likes' = 'latest'
+) {
     try {
         const currentUser = await getCurrentUser()
 
@@ -72,21 +94,28 @@ export async function getPosts(symbol: string) {
             where: { symbol }
         })
 
-        if (!stock) return { success: true, posts: [] }
+        if (!stock) return { success: true, posts: [], hasMore: false }
+
+        const skip = (page - 1) * limit
 
         const posts = await prisma.post.findMany({
             where: { stockId: stock.id },
-            orderBy: { createdAt: 'desc' },
+            orderBy: sort === 'likes'
+                ? { likes: { _count: 'desc' } }
+                : { createdAt: 'desc' },
+            skip,
+            take: limit,
             include: {
                 user: {
-                    select: { name: true, id: true }
+                    select: { name: true, id: true, reputation: true }
                 },
                 likes: true,
                 comments: {
                     include: {
                         user: {
-                            select: { name: true, id: true }
-                        }
+                            select: { name: true, id: true, reputation: true }
+                        },
+                        likes: true
                     },
                     orderBy: { createdAt: 'asc' }
                 },
@@ -96,18 +125,26 @@ export async function getPosts(symbol: string) {
             }
         })
 
+        // Check if there are more
+        const totalPosts = await prisma.post.count({ where: { stockId: stock.id } })
+        const hasMore = totalPosts > skip + limit
+
         // Process posts to add isLiked flag
         const processedPosts = posts.map(post => ({
             ...post,
-            isLiked: currentUser ? post.likes.some(like => like.userId === currentUser.userId) : false,
+            isLiked: currentUser ? post.likes.some((like: any) => like.userId === currentUser.userId) : false,
             likes: post._count.likes,
-            // comments are now the actual array
+            comments: post.comments.map((comment: any) => ({
+                ...comment,
+                isLiked: currentUser ? comment.likes.some((like: any) => like.userId === currentUser.userId) : false,
+                likes: comment.likes.length
+            }))
         }))
 
-        return { success: true, posts: processedPosts }
+        return { success: true, posts: processedPosts, hasMore }
     } catch (error) {
         console.error('Get posts error:', error)
-        return { error: '게시글을 불러오는데 실패했습니다' }
+        return { error: '게시글을 불러오는데 실패했습니다', hasMore: false }
     }
 }
 
@@ -181,12 +218,21 @@ export async function toggleLike(postId: string) {
         if (existingLike) {
             await prisma.like.delete({
                 where: {
-                    userId_postId: {
+                    userId_postId_commentId: {
                         userId: currentUser.userId,
-                        postId
+                        postId,
+                        commentId: null
                     }
                 }
             })
+            // Decrease reputation
+            const post = await prisma.post.findUnique({ where: { id: postId } })
+            if (post && post.userId !== currentUser.userId) {
+                await prisma.user.update({
+                    where: { id: post.userId },
+                    data: { reputation: { decrement: 1 } }
+                })
+            }
         } else {
             await prisma.like.create({
                 data: {
@@ -194,11 +240,56 @@ export async function toggleLike(postId: string) {
                     postId
                 }
             })
+            // Increase reputation
+            const post = await prisma.post.findUnique({ where: { id: postId } })
+            if (post && post.userId !== currentUser.userId) {
+                await prisma.user.update({
+                    where: { id: post.userId },
+                    data: { reputation: { increment: 1 } }
+                })
+            }
         }
 
         return { success: true }
     } catch (error) {
         console.error('Toggle like error:', error)
         return { error: '좋아요 처리에 실패했습니다' }
+    }
+}
+
+export async function getUserActivity() {
+    try {
+        const currentUser = await getCurrentUser()
+        if (!currentUser) return { error: '로그인이 필요합니다' }
+
+        const posts = await prisma.post.findMany({
+            where: { userId: currentUser.userId },
+            include: {
+                stock: true,
+                _count: { select: { likes: true, comments: true } }
+            },
+            orderBy: { createdAt: 'desc' }
+        })
+
+        const comments = await prisma.comment.findMany({
+            where: { userId: currentUser.userId },
+            include: {
+                post: {
+                    include: { stock: true }
+                }
+            },
+            orderBy: { createdAt: 'desc' }
+        })
+
+        // Combine and label them
+        const activity = [
+            ...posts.map(p => ({ ...p, type: 'post' as const })),
+            ...comments.map(c => ({ ...c, type: 'comment' as const }))
+        ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+
+        return { success: true, activity }
+    } catch (error) {
+        console.error('Get user activity error:', error)
+        return { error: '활동 내역을 불러오는데 실패했습니다' }
     }
 }

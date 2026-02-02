@@ -28,7 +28,7 @@ export async function GET(
 
         switch (range) {
             case '1d':
-                period1.setDate(now.getDate() - 2) // 2 days ago to cover weekends/holidays for intraday
+                period1.setDate(now.getDate() - 7) // 7 days ago to cover weekends/holidays securely
                 break
             case '1w':
                 period1.setDate(now.getDate() - 7)
@@ -51,18 +51,25 @@ export async function GET(
         }
 
         const chartResult = await yahooFinance.chart(symbol, queryOptions)
+        let quotes = (chartResult as any).quotes || []
 
-        // chartResult might be null or have error structure in some versions, but usually throws.
-        // It returns { meta, quotes, ... }
+        // Intraday Logic: Filter for the LATEST trading day only
+        if (range === '1d' && quotes.length > 0) {
+            const latestDateStr = new Date(quotes[quotes.length - 1].date).toDateString()
+            quotes = quotes.filter((q: any) => new Date(q.date).toDateString() === latestDateStr)
+        }
 
-        const quotes = (chartResult as any).quotes.map((q: any) => ({
-            time: q.date,
+        const formattedQuotes = quotes.map((q: any) => ({
+            time: new Date(q.date).getTime(),
+            value: q.close,
             open: q.open,
             high: q.high,
             low: q.low,
             close: q.close,
             volume: q.volume
         }))
+
+        return NextResponse.json({ success: true, data: formattedQuotes })
 
         return NextResponse.json({ success: true, data: quotes })
     } catch (error: any) {

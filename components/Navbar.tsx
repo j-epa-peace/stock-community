@@ -7,6 +7,7 @@ import { Home, MessageCircle, Heart, User, LogOut, LogIn, UserPlus } from 'lucid
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '@/context/AuthContext'
 import HotStockLogo from './HotStockLogo'
+import NavbarSearch from './NavbarSearch'
 
 export default function Navbar() {
   const { user, logout } = useAuth()
@@ -61,20 +62,21 @@ export default function Navbar() {
                     : 'text-gray-400 hover:text-white'
                     }`}
                 >
-                  관심종목
                 </Link>
               )}
+
+              <NavbarSearch />
 
               <div className="h-4 w-px bg-gray-700 mx-2"></div>
 
               {user ? (
                 <div className="flex items-center space-x-4">
-                  <div className="flex items-center space-x-2 px-3 py-1.5 bg-white/5 rounded-full border border-white/10 hover:bg-white/10 transition-colors">
+                  <Link href="/profile" className="flex items-center space-x-2 px-3 py-1.5 bg-white/5 rounded-full border border-white/10 hover:bg-white/10 transition-colors">
                     <div className="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center text-[10px] font-bold text-white uppercase border border-white/20 shadow-[0_0_10px_rgba(255,255,255,0.2)]">
                       {user.name.charAt(0)}
                     </div>
                     <span className="text-sm text-gray-200 font-medium">{user.name}</span>
-                  </div>
+                  </Link>
                   <button
                     onClick={handleLogout}
                     className="text-gray-400 hover:text-white transition-colors"
@@ -111,9 +113,9 @@ export default function Navbar() {
           </Link>
           {user && (
             <div className="flex items-center space-x-3">
-              <span className="text-sm font-bold bg-gradient-to-r from-gray-200 to-gray-400 bg-clip-text text-transparent">
+              <Link href="/profile" className="text-sm font-bold bg-gradient-to-r from-gray-200 to-gray-400 bg-clip-text text-transparent">
                 {user.name}
-              </span>
+              </Link>
               <button
                 onClick={handleLogout}
                 className="text-gray-400 hover:text-white"
@@ -134,7 +136,7 @@ export default function Navbar() {
           ...(user
             ? [
               { href: '/watchlist/add', icon: Heart, label: '관심종목' },
-              { href: '#profile', icon: User, label: '내정보', isProfile: true }
+              { href: '/profile', icon: User, label: '내정보' }
             ]
             : [
               { href: '/auth/signup', icon: UserPlus, label: '회원가입' },
@@ -143,19 +145,6 @@ export default function Navbar() {
           )
         ].map((item) => {
           const active = isActive(item.href)
-
-          // Profile item special case
-          if (item.isProfile) {
-            return (
-              <div key="profile" className="flex flex-col items-center justify-center">
-                <div className={`active-glow-container transition-all duration-300 ${active ? 'scale-110 drop-shadow-glow-white' : ''}`}>
-                  <div className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center border border-white/20 shadow-[0_0_10px_rgba(255,255,255,0.1)]">
-                    <User className="h-5 w-5 text-white" />
-                  </div>
-                </div>
-              </div>
-            )
-          }
 
           return (
             <Link

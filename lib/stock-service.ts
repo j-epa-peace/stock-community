@@ -6,14 +6,7 @@ if (yf.suppressNotices) {
     yf.suppressNotices(['yahooSurvey'])
 }
 
-interface Stock {
-    symbol: string
-    name: string
-    market: string
-    price: number
-    change: number
-    changePercent: number
-}
+import { Stock } from '@/types'
 
 // Helper to get Yahoo Finance symbol
 function getYahooSymbol(symbol: string, market?: string | null) {
@@ -68,6 +61,7 @@ export async function getRealTimeQuotes(stocks: Stock[]) {
 }
 
 export async function getRealTimeQuote(stock: Stock) {
+    // Fallback to Yahoo (removed Naver scraping)
     const result = await getRealTimeQuotes([stock])
     return result[0] || stock
 }
