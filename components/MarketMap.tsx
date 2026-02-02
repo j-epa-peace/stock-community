@@ -151,8 +151,8 @@ export default function MarketMap() {
                         <button
                             onClick={() => setMarketType('domestic')}
                             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-bold transition-all ${marketType === 'domestic'
-                                    ? 'bg-gray-700 text-white shadow-lg'
-                                    : 'text-gray-400 hover:text-white hover:bg-white/5'
+                                ? 'bg-gray-700 text-white shadow-lg'
+                                : 'text-gray-400 hover:text-white hover:bg-white/5'
                                 }`}
                         >
                             <Building2 className="w-3.5 h-3.5" /> 국내
@@ -160,8 +160,8 @@ export default function MarketMap() {
                         <button
                             onClick={() => setMarketType('global')}
                             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-bold transition-all ${marketType === 'global'
-                                    ? 'bg-blue-600 text-white shadow-lg'
-                                    : 'text-gray-400 hover:text-white hover:bg-white/5'
+                                ? 'bg-blue-600 text-white shadow-lg'
+                                : 'text-gray-400 hover:text-white hover:bg-white/5'
                                 }`}
                         >
                             <Globe className="w-3.5 h-3.5" /> 해외
@@ -190,7 +190,6 @@ export default function MarketMap() {
                             height={200}
                             data={mapData}
                             dataKey="size"
-                            ratio={4 / 3}
                             stroke="transparent"
                             fill="#1f2937"
                             content={<CustomizedContent />}

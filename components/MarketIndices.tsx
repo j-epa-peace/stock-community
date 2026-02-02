@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { LineChart, Line, XAxis, YAxis, ResponsiveContainer } from 'recharts'
+import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer } from 'recharts'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 
@@ -421,5 +421,3 @@ export default function MarketIndices() {
   )
 }
 
-// Fixed AreaChart import for sexy look
-import { AreaChart, Area } from 'recharts'
