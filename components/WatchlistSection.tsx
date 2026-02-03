@@ -136,7 +136,7 @@ export default function WatchlistSection() {
 
   return (
     <div className="bg-white/5 backdrop-blur-xl rounded-3xl shadow-glass p-6 mb-8 border border-white/10">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col md:flex-row justify-between items-center gap-4 md:gap-0 mb-6">
         <h2 className="text-2xl font-bold text-white tracking-tight">내 관심종목</h2>
         <div className="flex items-center gap-2">
           <button
@@ -171,20 +171,20 @@ export default function WatchlistSection() {
               key={item.id}
               className="block"
             >
-              <div className="flex justify-between items-center p-4 border border-white/5 rounded-2xl hover:bg-white/10 bg-white/5 transition-all duration-300 hover:border-white/20 hover:shadow-[0_0_15px_rgba(255,255,255,0.05)]">
-                <div>
+              <div className="flex flex-col md:flex-row justify-between items-center p-4 border border-white/5 rounded-2xl hover:bg-white/10 bg-white/5 transition-all duration-300 hover:border-white/20 hover:shadow-[0_0_15px_rgba(255,255,255,0.05)]">
+                <div className="mb-3 md:mb-0 text-center md:text-left">
                   <h3 className="font-bold text-white transition-colors">{item.stockName}</h3>
                   <p className="text-sm text-gray-500 font-medium">{item.stockSymbol.replace('.KS', '')}</p>
                 </div>
-                <div className="text-right">
+                <div className="text-center md:text-right">
                   {isLoading ? (
-                    <div className="h-8 w-24 bg-white/10 animate-pulse rounded" />
+                    <div className="h-8 w-24 bg-white/10 animate-pulse rounded mx-auto md:mx-0" />
                   ) : (
                     <>
                       <p className="font-bold text-white text-lg tracking-tight">
                         {formatStockPrice(price, stock?.market || 'KOSPI', isKrw ? 'KRW' : 'USD')}
                       </p>
-                      <div className="flex items-center justify-end space-x-2">
+                      <div className="flex items-center justify-center md:justify-end space-x-2">
                         <span className={`text-sm font-bold ${change >= 0 ? 'text-red-400' : 'text-blue-400'}`}>
                           {change >= 0 ? '+' : ''}
                           {formatStockPrice(Math.abs(change), stock?.market || 'KOSPI', isKrw ? 'KRW' : 'USD').replace(/[^0-9.,]/g, '')}

@@ -5,6 +5,7 @@
 @layer base {
   html {
     @apply dark;
+    overflow-x: hidden;
   }
 
   body {
@@ -12,6 +13,7 @@
     background-image: radial-gradient(circle at 50% 0%, #111827 0%, #000000 90%);
     background-attachment: fixed;
     caret-color: transparent;
+    overflow-x: hidden;
   }
 
   input,

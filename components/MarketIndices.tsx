@@ -12,7 +12,7 @@ interface MarketIndex {
   change: number
   changePercent: number
   previousClose?: number
-  data: { time: number; value: number }[] // Changed to number
+  data: { time: number; value: number }[]
 }
 
 type TabType = 'domestic' | 'global' | 'exchange' | 'crypto'
@@ -25,10 +25,9 @@ const MarketIndexCard = ({ index }: { index: MarketIndex }) => {
   useEffect(() => {
     const observer = new IntersectionObserver(
       ([entry]) => {
-        // Toggle visibility based on intersection for re-animation
         setIsVisible(entry.isIntersecting)
       },
-      { threshold: 0.1 } // Low threshold to trigger early
+      { threshold: 0.1 }
     )
 
     if (cardRef.current) {
@@ -38,87 +37,105 @@ const MarketIndexCard = ({ index }: { index: MarketIndex }) => {
     return () => observer.disconnect()
   }, [])
 
+  // Safety Check
+  if (!index || !index.data) return null
+
   const isUp = index.change >= 0
   const color = isUp ? '#ef4444' : '#3b82f6'
 
-  // 모바일 최적화 (데이터 포인트 샘플링)
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 768
   const dataPoints = isMobile ? index.data.filter((_, i) => i % 5 === 0) : index.data
-  const ticks = generateHourlyTicks(index.data) // Assuming this function is available or moved
-  const safeId = index.symbol.replace(/[^a-zA-Z0-9]/g, '')
+  // Moved ticks calculation to after domain logic
+  const safeId = (index.symbol || 'unknown').replace(/[^a-zA-Z0-9]/g, '')
 
-  // Calculate Fixed Domain for "Live" feel
+  // 1. Determine Market Config & Timezone
+  let timeZone = 'Asia/Seoul'
+  let openHour = 9
+  let openMinute = 0
+  let durationHours = 6.5 // Default KR 09:00 - 15:30
+
+  if (['NASDAQ', 'S&P 500'].some(s => index.name.includes(s))) {
+    timeZone = 'America/New_York'
+    openHour = 9
+    openMinute = 30
+    durationHours = 6.5
+  } else if (['Nikkei'].some(s => index.name.includes(s))) {
+    timeZone = 'Asia/Tokyo'
+    openHour = 9
+    openMinute = 0
+    durationHours = 6.0
+  } else if (['Shanghai'].some(s => index.name.includes(s))) {
+    timeZone = 'Asia/Shanghai'
+    openHour = 9
+    openMinute = 30
+    durationHours = 5.5
+  }
+
+  // 2. Calculate Domain based on "Last Data Point's Date" + Market Hours
   let domainStart: number | 'dataMin' = 'dataMin'
   let domainEnd: number | 'dataMax' = 'dataMax'
 
-  if (index.data.length > 0) {
+  const isCrypto = ['Bitcoin', 'Ethereum'].some(s => index.name.includes(s))
+
+  if (index.data.length > 0 && !isCrypto) {
     const lastPoint = index.data[index.data.length - 1].time
-    const date = new Date(lastPoint) // Base date from the data
+    try {
+      // Use Intl to parse the Last Point time in the target Timezone
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone,
+        hour: 'numeric',
+        minute: 'numeric',
+        second: 'numeric',
+        hour12: false
+      })
 
-    const isCrypto = ['Bitcoin', 'Ethereum'].some(s => index.name.includes(s))
-    const isUS = ['NASDAQ', 'S&P 500'].some(s => index.name.includes(s))
-    const isKR = ['KOSPI', 'KOSDAQ'].some(s => index.name.includes(s)) || index.name.includes('KRW')
-    const isCN = ['Shanghai', 'CNY'].some(s => index.name.includes(s))
-    const isJP = ['Nikkei'].some(s => index.name.includes(s))
+      const parts = formatter.formatToParts(new Date(lastPoint))
+      const getPart = (type: string) => parseInt(parts.find(p => p.type === type)?.value || '0')
 
-    if (!isCrypto) {
-      if (isKR) {
-        // KR: 09:00 - 15:30 KST
-        const open = new Date(lastPoint)
-        open.setHours(9, 0, 0, 0)
-        const close = new Date(lastPoint)
-        close.setHours(15, 30, 0, 0)
+      const currentHour = getPart('hour')
+      const currentMinute = getPart('minute')
+      const currentSecond = getPart('second')
 
-        // Handle case where specific data date might be different day due to timezone, 
-        // essentially we trust the 'lastPoint' is the correct "Day" in local time.
-        // But 'new Date(timestamp)' uses Local Device Time. This is a CLIENT COMPONENT.
-        // To be safe, we just want the span to be 6.5 hours.
-        // We anchor 'domainStart' to the first data point's "Floor to Hour" or explicitly reset hours if we can.
-        // Best approach for client side: Use the first data point of the day as 'Open' approximation for start?
-        // No, user wants FIXED axis.
+      // Calculate midnight offset for that specific day
+      const msSinceMidnight = (currentHour * 3600 + currentMinute * 60 + currentSecond) * 1000
+      const openMsFromMidnight = (openHour * 3600 + openMinute * 60) * 1000
 
-        // Use the Data's Start as 09:00 (if it's close enough)
-        // Simplest fixed visual: 
-        // Just take the Start timestamp of the day (09:00 KST) and End (15:30 KST).
-        // Problem: 'new Date()' on client might be EST.
-        // We need to work with relative offsets or timestamps.
+      // Backtrack to Open Time
+      const marketOpenTimestamp = lastPoint - (msSinceMidnight - openMsFromMidnight)
 
-        // Let's assume the data is correct.
-        // We want the chart to start at [FirstDataPoint (Open)] and end at [FirstDataPoint + MarketDuration]
-        const firstData = index.data[0].time
-        domainStart = firstData
-        domainEnd = firstData + (6.5 * 60 * 60 * 1000) // 6.5 Hours fixed width
-      } else if (isUS) {
-        // US: 09:30 - 16:00 (6.5 Hours)
-        const firstData = index.data[0].time
-        domainStart = firstData
-        domainEnd = firstData + (6.5 * 60 * 60 * 1000)
-      } else if (isCN) {
-        // CN: 09:30 - 15:00 (5.5 Hours) - often has lunch break but we ignore valid empty gap
-        const firstData = index.data[0].time
-        domainStart = firstData
-        domainEnd = firstData + (5.5 * 60 * 60 * 1000)
-      } else if (isJP) {
-        // JP: 09:00 - 15:00 (6 Hours)
-        const firstData = index.data[0].time
-        domainStart = firstData
-        domainEnd = firstData + (6 * 60 * 60 * 1000)
-      }
+      domainStart = marketOpenTimestamp
+      domainEnd = marketOpenTimestamp + (durationHours * 3600 * 1000)
+    } catch (e) {
+      console.error("Domain Calc Error", e)
+      // Fallback
+      domainStart = index.data[0].time
+      domainEnd = index.data[0].time + (durationHours * 3600 * 1000)
     }
   }
 
-  // Format Time Helper (Moved from parent or duplicated if simple)
-  const formatTime = (timestamp: number, name: string) => {
+  // 3. Helper: Format Time (Uses the SAME timeZone variable)
+  const formatTime = (timestamp: number) => {
     try {
       if (!timestamp) return ''
-      const date = new Date(timestamp)
-      let timeZone = 'Asia/Seoul'
-      if (name.includes('NASDAQ') || name.includes('S&P')) timeZone = 'America/New_York'
-      else if (name.includes('Nikkei') || name.includes('JPY')) timeZone = 'Asia/Tokyo'
-      else if (name.includes('Shanghai') || name.includes('CNY')) timeZone = 'Asia/Shanghai'
-      return date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone })
+      return new Intl.DateTimeFormat('ko-KR', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+        timeZone
+      }).format(new Date(timestamp))
     } catch { return '' }
   }
+
+  // 4. Helper: Generate Hourly Ticks
+  const ticks = generateHourlyTicks(
+    index.data,
+    typeof domainStart === 'number' ? domainStart : undefined,
+    typeof domainEnd === 'number' ? domainEnd : undefined
+  )
+
+
+
+
 
   return (
     <motion.div
@@ -129,7 +146,6 @@ const MarketIndexCard = ({ index }: { index: MarketIndex }) => {
       transition={{ duration: 0.4, type: "spring" }}
       className="min-w-[85vw] md:min-w-full flex-shrink-0 snap-center bg-white/5 backdrop-blur-xl rounded-3xl p-6 border border-white/10 shadow-glass relative overflow-hidden"
     >
-      {/* Card Header */}
       <div className="flex justify-between items-start mb-6">
         <div>
           <div className="flex items-center gap-2 mb-1">
@@ -157,7 +173,6 @@ const MarketIndexCard = ({ index }: { index: MarketIndex }) => {
         </div>
       </div>
 
-      {/* Chart */}
       <div className="h-28 -mx-2">
         {isVisible && (
           <ResponsiveContainer width="100%" height="100%">
@@ -174,7 +189,7 @@ const MarketIndexCard = ({ index }: { index: MarketIndex }) => {
                 type="number"
                 domain={[domainStart, domainEnd]}
                 ticks={ticks}
-                tickFormatter={(t) => formatTime(t, index.name)}
+                tickFormatter={formatTime}
                 tick={{ fill: '#9ca3af', fontSize: 11, fontWeight: 500 }}
                 axisLine={false}
                 tickLine={false}
@@ -182,54 +197,59 @@ const MarketIndexCard = ({ index }: { index: MarketIndex }) => {
               />
               <YAxis hide domain={['auto', 'auto']} />
 
-              {/* Layer 1: Fill with Fade Gradient (Animated Sync) */}
               <Area
                 type="monotone"
                 dataKey="value"
                 stroke="none"
                 fill={`url(#fillGradient-${safeId})`}
-                isAnimationActive={true} // Animation Enabled
-                animationDuration={2000} // Slower for effect
+                isAnimationActive={true}
+                animationDuration={2000}
                 animationEasing="ease-out"
-                connectNulls={false}
+                connectNulls={true}
               />
 
-              {/* Layer 2: Solid Stroke (Animated Sync) */}
               <Area
                 type="monotone"
                 dataKey="value"
                 stroke={color}
                 strokeWidth={2.5}
                 fill="none"
-                isAnimationActive={true} // Animation Enabled
+                isAnimationActive={true}
                 animationDuration={2000}
                 animationEasing="ease-out"
-                connectNulls={false}
+                connectNulls={true}
               />
             </AreaChart>
           </ResponsiveContainer>
         )}
       </div>
 
-      {/* Reference Line (Optional/Visual) */}
       <div className="absolute left-6 right-6 top-1/2 border-t border-dashed border-gray-600/30 pointer-events-none opacity-0" />
+
     </motion.div>
   )
 }
 
-// Helpers needed outside if not passed
-const generateHourlyTicks = (data: { time: number }[]) => {
-  if (!data.length) return []
-  const startTime = data[0].time
-  const endTime = data[data.length - 1].time
+const generateHourlyTicks = (data: { time: number }[], start?: number, end?: number) => {
+  if (!data.length && (!start || !end)) return []
+
+  const startTime = start ?? data[0].time
+  const endTime = end ?? data[data.length - 1].time
+
   const ticks = []
-  let current = new Date(startTime)
-  current.setMinutes(0, 0, 0)
-  if (current.getTime() < startTime) current.setHours(current.getHours() + 1)
-  while (current.getTime() <= endTime) {
-    ticks.push(current.getTime())
-    current.setHours(current.getHours() + 1)
+
+  // 1. Add Start Time
+  ticks.push(startTime)
+
+  // 2. Add Hourly Ticks (Aligned to 1 Hour boundary)
+  let nextHour = Math.ceil((startTime + 1) / 3600000) * 3600000
+
+  while (nextHour < endTime) {
+    ticks.push(nextHour)
+    nextHour += 3600000
+    if (ticks.length > 24) break
   }
+
   return ticks
 }
 
@@ -237,7 +257,7 @@ export default function MarketIndices() {
   const [indices, setIndices] = useState<MarketIndex[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<TabType>('domestic') // Moved up
+  const [activeTab, setActiveTab] = useState<TabType>('domestic')
   const [showLeft, setShowLeft] = useState(false)
   const [showRight, setShowRight] = useState(true)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -245,15 +265,12 @@ export default function MarketIndices() {
   const checkScroll = () => {
     if (scrollContainerRef.current) {
       const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current
-      // Tolerance for browser subpixel rendering
       setShowLeft(scrollLeft > 2)
       setShowRight(Math.ceil(scrollLeft + clientWidth) < scrollWidth - 2)
     }
   }
 
-  // Initial Check
   useEffect(() => {
-    // Check frequently
     checkScroll()
     const t1 = setTimeout(checkScroll, 100)
     const t2 = setTimeout(checkScroll, 300)
@@ -265,7 +282,6 @@ export default function MarketIndices() {
     }
   }, [indices, activeTab])
 
-  // Reset scroll position when tab changes
   useEffect(() => {
     if (scrollContainerRef.current) {
       scrollContainerRef.current.scrollTo({ left: 0, behavior: 'smooth' })
@@ -273,7 +289,6 @@ export default function MarketIndices() {
     }
   }, [activeTab])
 
-  // Fetch Real Data
   useEffect(() => {
     const fetchIndices = async () => {
       try {
@@ -294,7 +309,6 @@ export default function MarketIndices() {
     return () => clearInterval(interval)
   }, [])
 
-  // Filter Indices for Tabs
   const domesticIndices = indices.filter(i => ['KOSPI', 'KOSDAQ'].includes(i.name))
   const globalIndices = indices.filter(i => ['NASDAQ', 'S&P 500', 'Nikkei 225', 'Shanghai'].includes(i.name))
   const exchangeIndices = indices.filter(i => ['USD/KRW', 'JPY/KRW', 'CNY/KRW'].includes(i.name))
@@ -314,11 +328,23 @@ export default function MarketIndices() {
     )
   }
 
-  if (error) return null
+  if (error) {
+    return (
+      <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-6 mb-8 text-center">
+        <p className="text-red-400 text-sm font-medium mb-2">시장 데이터를 불러올 수 없습니다</p>
+        <p className="text-red-500/50 text-xs">{error}</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="mt-3 px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-400 text-xs rounded transition-colors"
+        >
+          재시도
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div className="mb-4">
-      {/* Header */}
       <div className="flex items-center gap-3 mb-3">
         <h2 className="text-2xl font-bold text-white tracking-tight">시장 지수</h2>
         <span className="text-[11px] px-2 py-0.5 rounded-full bg-green-500/10 text-green-400 font-medium border border-green-500/20 flex items-center gap-1.5">
@@ -327,7 +353,6 @@ export default function MarketIndices() {
         </span>
       </div>
 
-      {/* Tabs */}
       <div className="flex overflow-x-auto gap-2 mb-6 pb-2 hide-scrollbar">
         {[
           { id: 'domestic', label: '국내증시' },
@@ -348,10 +373,7 @@ export default function MarketIndices() {
         ))}
       </div>
 
-      {/* Carousel Container (Desktop & Mobile) */}
       <div className="relative group">
-        {/* Desktop Navigation Buttons */}
-        {/* Desktop Navigation Buttons */}
         <AnimatePresence>
           {showLeft && (
             <motion.button
@@ -403,8 +425,6 @@ export default function MarketIndices() {
             ))}
           </AnimatePresence>
         </div>
-
-
       </div>
 
       <style jsx global>{`
@@ -419,4 +439,3 @@ export default function MarketIndices() {
     </div >
   )
 }
-

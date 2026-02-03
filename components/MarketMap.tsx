@@ -7,19 +7,15 @@ import { Maximize2, Minimize2, Globe, Building2, Loader2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 const COLORS = {
-    upStrong: '#ef4444', // Red 500
-    upWeak: '#fca5a5',   // Red 300
-    flat: '#9ca3af',     // Gray 400
-    downWeak: '#93c5fd', // Blue 300
-    downStrong: '#3b82f6' // Blue 500
+    up: '#ef4444',   // Red 500
+    down: '#3b82f6', // Blue 500
+    flat: '#1f2937', // Gray 800 (Very Dark for background blend)
 };
 
 const getColor = (change: number) => {
-    if (change > 3) return COLORS.upStrong;
-    if (change > 0) return COLORS.upWeak;
-    if (change === 0) return COLORS.flat;
-    if (change > -3) return COLORS.downWeak;
-    return COLORS.downStrong;
+    if (change > 0) return COLORS.up;
+    if (change < 0) return COLORS.down;
+    return COLORS.flat;
 };
 
 export default function MarketMap() {
@@ -74,7 +70,7 @@ export default function MarketMap() {
                         fill="#fff"
                         fontSize={12}
                         fontWeight="bold"
-                        className="pointer-events-none opacity-50"
+                        className="pointer-events-none opacity-40 drop-shadow-glow-white"
                     >
                         {name}
                     </text>
@@ -88,6 +84,10 @@ export default function MarketMap() {
             const fontSize = Math.min(width / 5, 14);
             const percentFontSize = Math.min(width / 6, 12);
 
+            // Calculate opacity based on magnitude of change (0.3 to 1.0)
+            // Cap at 5% change for max opacity
+            const opacity = change === 0 ? 1 : Math.min(Math.abs(change) / 3 + 0.3, 0.9);
+
             return (
                 <g onClick={() => handleNodeClick(props)}>
                     <rect
@@ -97,12 +97,13 @@ export default function MarketMap() {
                         height={height}
                         style={{
                             fill: fillColor,
-                            stroke: '#111827', // darker gray border for contrast
-                            strokeWidth: 2,
+                            fillOpacity: opacity,
+                            stroke: 'rgba(0,0,0,0.5)', // slightly transparent black stroke
+                            strokeWidth: 1,
                             cursor: 'pointer',
                             transition: 'opacity 0.2s',
                         }}
-                        className="hover:opacity-80"
+                        className="hover:brightness-125 transition-all duration-300"
                     />
                     <text
                         x={x + width / 2}
@@ -111,7 +112,8 @@ export default function MarketMap() {
                         fill="#fff"
                         fontSize={fontSize}
                         fontWeight="bold"
-                        style={{ pointerEvents: 'none', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}
+                        style={{ pointerEvents: 'none' }}
+                        className="drop-shadow-[0_0_4px_rgba(0,0,0,0.8)]"
                     >
                         {name}
                     </text>
@@ -121,7 +123,8 @@ export default function MarketMap() {
                         textAnchor="middle"
                         fill="#fff"
                         fontSize={percentFontSize}
-                        style={{ pointerEvents: 'none', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}
+                        style={{ pointerEvents: 'none' }}
+                        className="drop-shadow-[0_0_4px_rgba(0,0,0,0.8)] opacity-90"
                     >
                         {change > 0 ? '+' : ''}{change}%
                     </text>
@@ -137,7 +140,7 @@ export default function MarketMap() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className={`bg-white/5 backdrop-blur-xl rounded-3xl shadow-glass border border-white/10 mb-8 overflow-hidden transition-all duration-500 flex flex-col
+            className={`bg-black/40 backdrop-blur-2xl rounded-3xl shadow-[0_8px_32px_rgba(0,0,0,0.3)] border border-white/10 mb-8 overflow-hidden transition-all duration-500 flex flex-col
         ${isExpanded ? 'fixed inset-4 z-50 h-auto' : 'relative h-[500px]'}`}
         >
             <div className="flex justify-between items-center p-6 border-b border-white/10 shrink-0">
