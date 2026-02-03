@@ -3,13 +3,12 @@ import YahooFinance from 'yahoo-finance2'
 
 const yahooFinance = new (YahooFinance as any)()
 
-// Suppress notices on the instance
+// Suppress notices
 if (yahooFinance.suppressNotices) {
     yahooFinance.suppressNotices(['yahooSurvey'])
 }
 
 export async function GET() {
-
     try {
         const symbols = [
             { ticker: '^KS11', name: 'KOSPI' },
@@ -23,24 +22,15 @@ export async function GET() {
             { ticker: 'CNYKRW=X', name: 'CNY/KRW' },
             { ticker: 'BTC-KRW', name: 'Bitcoin' },
             { ticker: 'ETH-KRW', name: 'Ethereum' }
-
-
         ]
 
         const results = await Promise.all(
             symbols.map(async (symbol) => {
                 try {
-                    // 1. 현재가 정보 가져오기 (Quote)
-                    // 2. 당일 차트 데이터 가져오기 (1일, 1분 간격)
-                    // 2. 당일 차트 데이터 가져오기 (1일, 1분 간격)
-                    // 'range' 옵션 유효성 검사 실패 시 'period1' 사용
                     const period1 = new Date()
-                    // 1m data is usually available for last 7 days.
-                    // We need max range to cover long holidays (like Lunar New Year).
-                    period1.setDate(period1.getDate() - 7)
+                    period1.setDate(period1.getDate() - 7) // 7 days lookback
 
-                    // Helper to fetch data with specific interval
-                    const fetchWithInterval = async (interval: '1m' | '5m' | '60m') => {
+                    const fetchWithInterval = async (interval: '1m' | '5m' | '15m' | '60m') => {
                         const queryOptions = {
                             period1: period1.toISOString(),
                             interval: interval,
@@ -49,35 +39,78 @@ export async function GET() {
                         return yahooFinance.chart(symbol.ticker, queryOptions).catch(() => ({ quotes: [], meta: {} })) as any
                     }
 
-                    // 1. Try 1m interval first (Best Resolution)
-                    let chartDataResult = await fetchWithInterval('1m')
+                    const getLatestDayQuotes = (quotes: any[]) => {
+                        if (!quotes || quotes.length === 0) return []
+                        const lastQuoteDate = new Date(quotes[quotes.length - 1].date)
+                        const lastDateStr = `${lastQuoteDate.getUTCFullYear()}-${lastQuoteDate.getUTCMonth()}-${lastQuoteDate.getUTCDate()}`
 
-                    // 2. Fallback to 5m if 1m returns empty
-                    if (!chartDataResult.quotes || chartDataResult.quotes.length === 0) {
-                        // console.log(`Fallback to 5m for ${symbol.ticker}`)
-                        chartDataResult = await fetchWithInterval('5m')
+                        return quotes.filter((item: any) => {
+                            const d = new Date(item.date)
+                            const dStr = `${d.getUTCFullYear()}-${d.getUTCMonth()}-${d.getUTCDate()}`
+                            return dStr === lastDateStr
+                        })
                     }
 
-                    // 3. Fallback to 60m (1h) if 5m also fails (Maximum Robustness)
-                    if (!chartDataResult.quotes || chartDataResult.quotes.length === 0) {
-                        // console.log(`Fallback to 60m for ${symbol.ticker}`)
-                        chartDataResult = await fetchWithInterval('60m')
+                    // Helper: Filter nulls
+                    const getValidQuotes = (quotes: any[]) => quotes.filter((q: any) => q.close !== null && q.close !== undefined)
+
+                    // Strategy:
+                    // 1. Fetch 5m (Base Standard)
+                    // 2. Determine Active vs Closed
+                    // 3. If Active (Today) -> Try 1m. If good, use it. Else use 5m.
+                    // 4. If Closed (Past) -> Use 5m (Standard).
+
+                    let bestQuotes: any[] = []
+                    let chartMeta = {}
+                    let usedInterval = '5m'
+                    const now = new Date()
+
+                    // Step 1: Fetch Base 5m
+                    let res5m = await fetchWithInterval('5m')
+                    let candidates5m = getLatestDayQuotes(res5m.quotes)
+                    let valid5m = getValidQuotes(candidates5m)
+
+                    chartMeta = res5m.meta || {}
+                    usedInterval = '5m'
+
+                    const lastPointDate = candidates5m.length > 0 ? new Date(candidates5m[candidates5m.length - 1].date) : new Date(0)
+                    const isSameDayUTC = lastPointDate.getUTCDate() === now.getUTCDate() && lastPointDate.getUTCMonth() === now.getUTCMonth()
+
+                    if (isSameDayUTC) {
+                        // === ACTIVE MARKET ===
+                        // Try higher resolution (1m)
+                        let res1m = await fetchWithInterval('1m')
+                        let valid1m = getValidQuotes(getLatestDayQuotes(res1m.quotes))
+
+                        if (valid1m.length >= 30) { // If we have > 30 mins of 1m data, prefer it
+                            bestQuotes = valid1m
+                            usedInterval = '1m'
+                            chartMeta = res1m.meta || chartMeta
+                        } else {
+                            // Fallback to 5m (already fetched)
+                            bestQuotes = valid5m
+                            usedInterval = '5m'
+                        }
+                    } else {
+                        // === CLOSED MARKET ===
+                        // Standardize on 5m as requested
+                        bestQuotes = valid5m
+                        usedInterval = '5m'
+
+                        // Fallback logic for EXTREME edge cases (virtually no data)
+                        if (bestQuotes.length === 0) {
+                            let res15m = await fetchWithInterval('15m')
+                            bestQuotes = getValidQuotes(getLatestDayQuotes(res15m.quotes))
+                            usedInterval = '15m'
+                            chartMeta = res15m.meta || chartMeta
+                        }
                     }
 
                     const quoteData = await yahooFinance.quote(symbol.ticker)
-
-                    // Handle case where chart fetch returned fallback object
-                    const chartData = chartDataResult || { quotes: [], meta: {} }
-                    const quote = chartData.meta || {}
+                    const quote = chartMeta as any
                     const realPreviousClose = quoteData.regularMarketPreviousClose || quote.chartPreviousClose || quote.previousClose
 
-                    // 데이터 매핑 및 최신 거래일 하루치만 필터링
-                    const quotes = chartData.quotes || []
-
-                    // 1. 가장 마지막 데이터의 날짜를 기준으로 필터링 (UTC 기준 날짜 비교)
-                    // Server Timezone Issue 방지를 위해 toDateString() 대신 YYYY-MM-DD 문자열 직접 비교
-                    if (quotes.length === 0) {
-                        // Return valid quote even if chart is empty
+                    if (bestQuotes.length === 0) {
                         return {
                             name: symbol.name,
                             symbol: symbol.ticker,
@@ -85,25 +118,15 @@ export async function GET() {
                             change: quoteData.regularMarketChange || quote.regularMarketChange || 0,
                             changePercent: quoteData.regularMarketChangePercent || quote.regularMarketChangePercent || 0,
                             previousClose: realPreviousClose || 0,
-                            data: []
+                            data: [],
+                            interval: usedInterval
                         }
                     }
 
-                    const lastQuoteDate = new Date(quotes[quotes.length - 1].date)
-                    const lastDateStr = `${lastQuoteDate.getUTCFullYear()}-${lastQuoteDate.getUTCMonth()}-${lastQuoteDate.getUTCDate()}`
-
-                    // 2. 가장 최근 날짜의 데이터만 필터링 (장중이면 오픈~현재)
-                    const history = quotes
-                        .filter((item: any) => {
-                            const d = new Date(item.date)
-                            const dStr = `${d.getUTCFullYear()}-${d.getUTCMonth()}-${d.getUTCDate()}`
-                            return dStr === lastDateStr
-                        })
-                        .map((item: any) => ({
-                            time: new Date(item.date).getTime(),
-                            value: item.close
-                        }))
-                        .filter((item: any) => item.value !== null && item.value !== undefined)
+                    const history = bestQuotes.map((item: any) => ({
+                        time: new Date(item.date).getTime(),
+                        value: item.close
+                    }))
 
                     return {
                         name: symbol.name,
@@ -112,7 +135,8 @@ export async function GET() {
                         change: quoteData.regularMarketChange || quote.regularMarketChange,
                         changePercent: quoteData.regularMarketChangePercent || quote.regularMarketChangePercent,
                         previousClose: realPreviousClose,
-                        data: history
+                        data: history,
+                        interval: usedInterval
                     }
                 } catch (error) {
                     console.error(`Failed to fetch data for ${symbol.name}:`, error)
@@ -121,9 +145,7 @@ export async function GET() {
             })
         )
 
-        // 실패한 요청 필터링
         const validResults = results.filter(item => item !== null)
-
         return NextResponse.json(validResults)
     } catch (error) {
         console.error('Market indices fetch error:', error)
