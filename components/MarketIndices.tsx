@@ -45,42 +45,41 @@ const MarketIndexCard = ({ index }: { index: MarketIndex }) => {
 
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 768
   const dataPoints = isMobile ? index.data.filter((_, i) => i % 5 === 0) : index.data
-  // Moved ticks calculation to after domain logic
+
   const safeId = (index.symbol || 'unknown').replace(/[^a-zA-Z0-9]/g, '')
 
   // 1. Determine Market Config & Timezone
-  let timeZone = 'Asia/Seoul'
-  let openHour = 9
-  let openMinute = 0
-  let durationHours = 6.5 // Default KR 09:00 - 15:30
-
-  if (['NASDAQ', 'S&P 500'].some(s => index.name.includes(s))) {
-    timeZone = 'America/New_York'
-    openHour = 9
-    openMinute = 30
-    durationHours = 6.5
-  } else if (['Nikkei'].some(s => index.name.includes(s))) {
-    timeZone = 'Asia/Tokyo'
-    openHour = 9
-    openMinute = 0
-    durationHours = 6.0
-  } else if (['Shanghai'].some(s => index.name.includes(s))) {
-    timeZone = 'Asia/Shanghai'
-    openHour = 9
-    openMinute = 30
-    durationHours = 5.5
+  const getMarketConfig = (name: string) => {
+    if (['NASDAQ', 'S&P 500'].some(s => name.includes(s))) {
+      return { timeZone: 'America/New_York', openHour: 9, openMinute: 30, durationHours: 6.5, label: 'EST' }
+    }
+    if (['Nikkei'].some(s => name.includes(s))) {
+      return { timeZone: 'Asia/Tokyo', openHour: 9, openMinute: 0, durationHours: 6.0, label: 'JST' }
+    }
+    if (['Shanghai', '000001.SS'].some(s => name.includes(s))) {
+      return { timeZone: 'Asia/Shanghai', openHour: 9, openMinute: 30, durationHours: 5.5, label: 'CST' }
+    }
+    if (['Bitcoin', 'Ethereum'].some(s => name.includes(s))) {
+      return { timeZone: 'UTC', openHour: 0, openMinute: 0, durationHours: 24, label: 'UTC' }
+    }
+    if (['USD/KRW', 'JPY/KRW', 'CNY/KRW'].some(s => name.includes(s))) {
+      return { timeZone: 'Asia/Seoul', openHour: 9, openMinute: 0, durationHours: 24, label: 'KST' }
+    }
+    return { timeZone: 'Asia/Seoul', openHour: 9, openMinute: 0, durationHours: 6.5, label: 'KST' }
   }
+
+  const config = getMarketConfig(index.name)
+  const { timeZone, openHour, openMinute, durationHours, label } = config
 
   // 2. Calculate Domain based on "Last Data Point's Date" + Market Hours
   let domainStart: number | 'dataMin' = 'dataMin'
   let domainEnd: number | 'dataMax' = 'dataMax'
 
-  const isCrypto = ['Bitcoin', 'Ethereum'].some(s => index.name.includes(s))
+  const isCrypto = ['Bitcoin', 'Ethereum', 'KRW', 'JPY', 'CNY'].some(s => index.name.includes(s))
 
   if (index.data.length > 0 && !isCrypto) {
     const lastPoint = index.data[index.data.length - 1].time
     try {
-      // Use Intl to parse the Last Point time in the target Timezone
       const formatter = new Intl.DateTimeFormat('en-US', {
         timeZone,
         hour: 'numeric',
@@ -96,18 +95,16 @@ const MarketIndexCard = ({ index }: { index: MarketIndex }) => {
       const currentMinute = getPart('minute')
       const currentSecond = getPart('second')
 
-      // Calculate midnight offset for that specific day
       const msSinceMidnight = (currentHour * 3600 + currentMinute * 60 + currentSecond) * 1000
       const openMsFromMidnight = (openHour * 3600 + openMinute * 60) * 1000
 
-      // Backtrack to Open Time
+      // Robust Open Time Calculation
       const marketOpenTimestamp = lastPoint - (msSinceMidnight - openMsFromMidnight)
 
       domainStart = marketOpenTimestamp
       domainEnd = marketOpenTimestamp + (durationHours * 3600 * 1000)
     } catch (e) {
       console.error("Domain Calc Error", e)
-      // Fallback
       domainStart = index.data[0].time
       domainEnd = index.data[0].time + (durationHours * 3600 * 1000)
     }
@@ -135,8 +132,6 @@ const MarketIndexCard = ({ index }: { index: MarketIndex }) => {
 
 
 
-
-
   return (
     <motion.div
       ref={cardRef}
@@ -151,10 +146,7 @@ const MarketIndexCard = ({ index }: { index: MarketIndex }) => {
           <div className="flex items-center gap-2 mb-1">
             <h3 className="text-gray-400 font-medium text-sm">{index.name}</h3>
             <span className="text-[10px] bg-gray-700 text-gray-400 px-1.5 py-0.5 rounded">
-              {['KOSPI', 'KOSDAQ', 'USD/KRW'].some(s => index.name.includes(s)) ? 'KST' :
-                ['NASDAQ', 'S&P 500', 'Bitcoin', 'Ethereum'].some(s => index.name.includes(s)) ? 'EST' :
-                  ['Nikkei'].some(s => index.name.includes(s)) ? 'JST' :
-                    ['Shanghai', 'CNY'].some(s => index.name.includes(s)) ? 'CST' : 'Local'}
+              {label}
             </span>
           </div>
           <div className="flex items-baseline gap-3">
@@ -194,6 +186,7 @@ const MarketIndexCard = ({ index }: { index: MarketIndex }) => {
                 axisLine={false}
                 tickLine={false}
                 dy={10}
+                padding={{ left: 0, right: 0 }}
               />
               <YAxis hide domain={['auto', 'auto']} />
 

@@ -24,6 +24,12 @@ export async function createComment(data: { postId: string; content: string; par
             }
         })
 
+        // Increase reputation by 2 for creating a comment
+        await prisma.user.update({
+            where: { id: currentUser.userId },
+            data: { reputation: { increment: 2 } }
+        })
+
         return {
             success: true,
             comment: {

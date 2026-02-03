@@ -72,6 +72,12 @@ export async function createPost(data: {
             }
         })
 
+        // Increase reputation by 5 for creating a post
+        await prisma.user.update({
+            where: { id: currentUser.userId },
+            data: { reputation: { increment: 5 } }
+        })
+
         revalidatePath(`/stocks/${targetSymbol}`)
         return {
             success: true,

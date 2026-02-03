@@ -34,6 +34,10 @@ export default function StockDetailClient({ symbol, stock }: { symbol: string; s
   // Initial Data Fetch
   useEffect(() => {
     fetchStockChart('1d')
+  }, [symbol])
+
+  // Interval Fetch
+  useEffect(() => {
     const intervalId = setInterval(() => {
       if (!document.hidden) {
         fetchStockChart(timeRange)
